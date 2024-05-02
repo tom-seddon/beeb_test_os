@@ -1,0 +1,249 @@
+                .include "submodules/beeb/include/beeb.s65"
+
+;-------------------------------------------------------------------------
+
+*=0
+                .dsection zp
+                
+*=$c000
+                ; don't put anything in the VDU driver region.
+                brk
+*=$e000
+                .dsection code
+                .cerror *>$fffa,'code overflow'
+*=$fffa
+                .dsection vectors
+
+;-------------------------------------------------------------------------
+
+set_mode: .macro table,palette,ula
+                lda #\ula
+                sta video_ula_control
+
+                ldx #size(\table)-1
+-
+                stx $fe00
+                lda \table,x
+                sta $fe01
+                dex
+                bpl -
+
+                ldx #15
+-
+                lda \palette,x
+                sta video_ula_palette
+                dex
+                bpl -
+                
+                .endmacro
+
+copy_message: .macro addr,text
+                ldx #0
+-
+                inx
+                lda \text-1,x
+                sta \addr-1,x
+                bpl -
+                .endmacro
+                
+;-------------------------------------------------------------------------
+
+                .section zp
+
+                ; These values are not guaranteed to be correct, of
+                ; course, if the memory is borked! But what else can
+                ; you do?
+wanted_byte: .fill 0
+got_byte: .fill 0
+                .endsection
+                
+;-------------------------------------------------------------------------
+
+
+                .section code
+nmi_entry_point:
+                rti
+
+irq_entry_point:
+                rti
+
+reset_entry_point:
+                sei
+
+                lda #0
+                sta $fe30       ; disable ANDY (if present)
+
+                sta $fe34       ; select main RAM
+
+                .set_mode mode7_crtc_values,palette_mono,$4a
+                .set_mode crtc_20KB,palette_mono,$9c
+                
+test:
+                ldx #0          ; X = pattern index
+                ldy #0          ; Y = page offset
+fill_loop:
+                lda patterns,x
+                
+                .for _i=0,_i<128,_i+=1
+                sta _i*256,y
+                .endfor
+
+                iny
+                bne fill_loop
+
+check_loop:
+                .for _i=0,_i<128,_i+=1
+                lda _i*256,y
+                cmp patterns,x
+                beq +
+
+                sta got_byte
+                lda patterns,x
+                sta wanted_byte
+                
+                ldx #_i
+                txs             ; S = page
+                jmp error
++
+                .endfor
+
+                inx
+                cpx #size(patterns)
+                bne fill_loop
+                jmp test
+
+error:
+                ; S = page
+                ; Y = page offset
+
+                .set_mode mode7_crtc_values,palette_mono,$4a
+
+                ldx #0
+cls_loop:
+                sta $7c00,x
+                sta $7d00,x
+                sta $7e00,x
+                sta $7f00,x
+                inx
+                bne cls_loop
+
+                .copy_message address_addr,address_message
+                lda msn_digit,y
+                sta address_addr+2,x
+                lda lsn_digit,y
+                sta address_addr+3,x
+
+                txa
+                tay
+                tsx
+                lda msn_digit,x
+                sta address_addr+0,y
+                lda lsn_digit,x
+                sta address_addr+1,y
+
+                .copy_message wanted_addr,wanted_message
+                ldy wanted_byte
+                lda msn_digit,y
+                sta wanted_addr+0,x
+                lda lsn_digit,y
+                sta wanted_addr+1,x
+
+                .copy_message got_addr,got_message
+                ldy got_byte
+                lda msn_digit,y
+                sta got_addr+0,x
+                lda lsn_digit,y
+                sta got_addr+1,x
+
+hang:
+                jmp hang
+
+address_addr=$7c00+40
+address_message:
+                .shift "Address: &"
+
+wanted_addr=$7c00+2*40
+wanted_message:
+                .shift "Wanted:  &"
+
+got_addr=$7c00+3*40
+got_message:
+                .shift "Got:     &"
+
+msn_digit:
+                .for _i=0,_i<256,_i+=1
+                .byte format("%X",_i>>4)
+                .endfor
+
+lsn_digit:
+                .for _i=0,_i<256,_i+=1
+                .byte format("%X",_i&15)
+                .endfor
+
+patterns: .block
+                .byte $00
+                .for _i:=0,_i<8,_i+=1
+                .byte 1<<_i
+                .byte $00
+                .byte $ff
+                .endfor
+                .byte $aa,0
+                .byte $55,0
+                .for _i:=0,_i<8,_i+=1
+                .byte (~(1<<_i))&$ff
+                .byte $00
+                .byte $ff
+                .endfor
+                .endblock
+                
+mode7_crtc_values: .block
+                .byte  $3F  ; 0 Horizontal Total     =64
+                .byte  $28  ; 1 Horizontal Displayed =40
+                .byte  $33  ; 2 Horizontal Sync      =&33  Note: &31 is a better value
+                .byte  $24  ; 3 HSync Width+VSync    =&24  VSync=2, HSync=4
+                .byte  $1E  ; 4 Vertical Total       =30
+                .byte  $02  ; 5 Vertical Adjust      =2
+                .byte  $19  ; 6 Vertical Displayed   =25
+                .byte  $1B  ; 7 VSync Position       =&1B
+                .byte  $93  ; 8 Interlace+Cursor     =&93  Cursor=2, Display=1, Interlace=Sync+Video
+                .byte  $12  ; 9 Scan Lines/Character =19
+                .byte  $72 ;10 Cursor Start Line    =&72  Blink=On, Speed=1/32, Line=18
+                .byte  $13  ;11 Cursor End Line      =19
+                .byte $28,$00   ;12,13 start address
+                .byte $28,$00   ; 14,15 cursor position
+                .endblock
+
+crtc_20KB: .block  ;MODEs 0/1/2
+                .byte $7F            ;R0 - Horizontal Total
+                .byte $50            ;R1 - Horizontal Displayed
+                .byte $62            ;R2 - Horizontal Sync
+                .byte $28            ;R3 - Sync Width (%vvvvhhhh)
+                .byte $26            ;R4 - Vertical Total
+                .byte $00            ;R5 - Vertical Total Adjust
+                .byte $20            ;R6 - Vertical Displayed
+                .byte $22            ;R7 - Vertical Sync Position
+                .byte 1;CRTC.R8.cursorDelay0|CRTC.R8.displayDelay0|CRTC.R8.interlaceSync ;R8 - Interlace/Delay
+                .byte $07               ;R9 - Scan lines per character
+                .byte $67;CRTC.R10.blink|CRTC.R10.slowBlink|7 ;R10 - Cursor blink/start
+                .byte 8                    ;R11 - Cursor End
+                .byte $30>>3,0             ;R12,R13 - start address
+                .byte $30>>3,0             ; R14,R15 - cursor position
+                .endblock
+                
+palette_mono:
+                .for _i=0,_i<16,_i+=1
+                .byte _i<<4|(_i<8?7:0)
+                .endfor
+                
+                
+                .endsection
+
+;-------------------------------------------------------------------------
+
+                .section vectors
+                .word nmi_entry_point
+                .word reset_entry_point
+                .word irq_entry_point
+                .endsection
+
+;-------------------------------------------------------------------------
