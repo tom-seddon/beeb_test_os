@@ -67,6 +67,13 @@ nmi_entry_point:
 irq_entry_point:
                 rti
 
+keys_table: .block
+                .byte key_caps_lock
+                .byte key_shift_lock
+                .byte key_m
+                .byte key_0
+                .endblock
+
 reset_entry_point:
                 sei
 
@@ -75,6 +82,84 @@ reset_entry_point:
 
                 sta $fe34       ; select main RAM
 
+                ; Port A keyboard access
+                lda #%01111111
+                sta system_via.ddra
+
+                ; Port B writes to addressable latch
+                lda #%00001111
+                sta system_via.ddrb
+
+                lda #8+0        ; disable sound write
+                sta system_via.orb
+                lda #8+1        ; disable speech read
+                sta system_via.orb
+                lda #8+2        ; disable speech write
+                sta system_via.orb
+                lda #0+3        ; enable keyboard write
+                sta system_via.orb
+
+                lda #0+6        ; caps lock LED off
+                sta system_via.orb
+                lda #0+7        ; shift lock LED off
+                sta system_via.orb
+
+                lda #0          ; LED state
+wait_for_key_loop:
+                ; keyboard scan
+                ldx #size(keys_table)-1
+scan_loop:
+                ldy keys_table,x
+                sty system_via.ora_no_handshake
+                bit system_via.ira_no_handshake
+                bpl next_key
+debounce_loop:
+                bit system_via.ira_no_handshake
+                bmi debounce_loop
+                cpy #key_caps_lock
+                beq toggle_leds
+                cpy #key_shift_lock
+                beq toggle_leds
+                cpy #key_m
+                beq memory_test
+                cpy #key_0
+                beq clear_test
+next_key:
+                dex
+                bpl scan_loop
+                jmp wait_for_key_loop
+
+toggle_leds:
+                eor #8
+                and #8
+                ora #7
+                sta system_via.orb ; set shift lock state
+                and #8
+                ora #6
+                sta system_via.orb ; set caps lock state
+                jmp wait_for_key_loop
+
+clear_test:
+                .set_mode mode7_crtc_values,palette_mono,$4a
+
+                lda #0
+                ldx #0
+clear_fill_loop:
+                .for _i=0,_i<128,_i+=1
+                sta _i*256,x
+                .endfor
+                inx
+                bne clear_fill_loop
+
+clear_read_loop:
+                .for _i=0,_i<128,_i+=1
+                lda _i*256,x
+                .endfor
+                inx
+                jmp clear_read_loop
+                
+
+memory_test:
                 .set_mode mode7_crtc_values,palette_mono,$4a
                 .set_mode crtc_20KB,palette_mono,$9c
                 

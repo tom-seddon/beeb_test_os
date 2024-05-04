@@ -3,3 +3,7 @@
 #+begin_src elisp
 ((nil . ((compile-command . "cd DIR && make tom_laptop"))))
 #+end_src
+
+* minipro
+
+: minipro --write beeb_test_os.bin --device 'TMS27C128@DIP28'
