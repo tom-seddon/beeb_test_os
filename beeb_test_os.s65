@@ -16,6 +16,13 @@
 
 ;-------------------------------------------------------------------------
 
+; value OR'd into all test patterns when read - use to exclude bits
+; known to be bad
+test_mask=0
+
+;-------------------------------------------------------------------------
+
+; Preserves Y/C
 set_mode: .macro table,palette,ula
                 lda #\ula
                 sta video_ula_control
@@ -28,15 +35,17 @@ set_mode: .macro table,palette,ula
                 dex
                 bpl -
 
+                .if \palette>=0
                 ldx #15
 -
                 lda \palette,x
                 sta video_ula_palette
                 dex
                 bpl -
-                
+                .endif
                 .endmacro
 
+; Preserves Y/C
 copy_message: .macro addr,text
                 ldx #0
 -
@@ -44,6 +53,59 @@ copy_message: .macro addr,text
                 lda \text-1,x
                 sta \addr-1,x
                 bpl -
+                .endmacro
+
+; Preserves A/Y/C
+handle_key: .macro key,routine
+                ldx #\key
+                stx system_via.ora_no_handshake
+                bit system_via.ora_no_handshake
+                bpl not_pressed
+wait_for_up_loop:
+                bit system_via.ora_no_handshake
+                bmi wait_for_up_loop
+                jmp \routine
+not_pressed:
+                .endmacro
+
+; Preserves A/Y
+cycle_crtc_address: .macro
+                tax
+                lda #12
+                sta $fe00
+                lda $fe01
+                cmp #$20
+                bcs cycle_done  ; taken if mode 7 - don't adjust
+                clc
+                adc #$20>>3     ; +8 KB
+                cmp #$10        ; past end of RAM?
+                bcc got_addr    ; taken if ok
+                lda #$00        ; reset address
+got_addr:
+                sta $fe01       ; update address
+cycle_done:
+                txa
+                .endmacro
+
+; Preserves A/Y
+show_crtc_address_in_LEDs: .macro
+                tax
+                lda #12
+                sta $fe00
+                lda $fe01
+                and #%00001100  ; extract 8 KB region index
+                
+                ; Reflect address in LEDs. Only bits 0-3 of ORB are
+                ; outputs so bits 4-7 in the value written can be
+                ; anything.
+                asl a           ; %000xy000
+                eor #%00011000  ; since 1=LED off, 0=LED on
+                ora #7          ; do shift lock LED
+                sta system_via.orb
+                lsr a
+                and #8          ; mask off just LED state
+                ora #6          ; do caps lock LED
+                sta system_via.orb
                 .endmacro
                 
 ;-------------------------------------------------------------------------
@@ -67,20 +129,33 @@ nmi_entry_point:
 irq_entry_point:
                 rti
 
-keys_table: .block
-                .byte key_caps_lock
-                .byte key_shift_lock
-                .byte key_m
-                .byte key_0
-                .endblock
-
 reset_entry_point:
                 sei
 
                 lda #0
-                sta $fe30       ; disable ANDY (if present)
+                .rept 5
+                sta 0
+                .endrept
 
-                sta $fe34       ; select main RAM
+                lda #0
+                sta $fe30       ; disable ANDY (if B+ or later)
+                sta $fe34       ; select main RAM (if B+ or later)
+
+                ; check if initialisation was (probably) run on a
+                ; previous boot
+                ldx #0          ; not previously initialised
+                lda system_via.ddra
+                cmp #%01111111
+                bne +
+                lda system_via.ddrb
+                cmp #%00001111
+                bne +
+                lda system_via.acr
+                bne +
+
+                ; Looks like this isn't a power-on boot
+                dex
++
 
                 ; Port A keyboard access
                 lda #%01111111
@@ -89,6 +164,10 @@ reset_entry_point:
                 ; Port B writes to addressable latch
                 lda #%00001111
                 sta system_via.ddrb
+
+                ; Disable port A input latching
+                lda #0
+                sta system_via.acr
 
                 lda #8+0        ; disable sound write
                 sta system_via.orb
@@ -99,76 +178,231 @@ reset_entry_point:
                 lda #0+3        ; enable keyboard write
                 sta system_via.orb
 
+                ; set 20 KB CRTC wraparound
+                lda #8+5
+                sta system_via.orb
+                lda #0+4
+                sta system_via.orb
+                
                 lda #0+6        ; caps lock LED off
                 sta system_via.orb
-                lda #0+7        ; shift lock LED off
+                lda #8+7        ; shift lock LED off
                 sta system_via.orb
 
-                lda #0          ; LED state
-wait_for_key_loop:
-                ; keyboard scan
-                ldx #size(keys_table)-1
-scan_loop:
-                ldy keys_table,x
-                sty system_via.ora_no_handshake
-                bit system_via.ira_no_handshake
-                bpl next_key
-debounce_loop:
-                bit system_via.ira_no_handshake
-                bmi debounce_loop
-                cpy #key_caps_lock
-                beq toggle_leds
-                cpy #key_shift_lock
-                beq toggle_leds
-                cpy #key_m
-                beq memory_test
-                cpy #key_0
-                beq clear_test
-next_key:
-                dex
-                bpl scan_loop
-                jmp wait_for_key_loop
-
-toggle_leds:
-                eor #8
-                and #8
-                ora #7
-                sta system_via.orb ; set shift lock state
-                and #8
-                ora #6
-                sta system_via.orb ; set caps lock state
-                jmp wait_for_key_loop
-
-clear_test:
-                .set_mode mode7_crtc_values,palette_mono,$4a
-
                 lda #0
+                .rept 10
+                sta 0
+                .endrept
+
+                ; Only initialise mode on a power-on reset
+                cpx #0
+                bne +
+                .set_mode crtc_teletext,-1,$4a
++
+                
+main_menu:
+                ldy #0          ; LED state counter
+main_menu_loop:
+                ; .handle_key key_caps_lock,toggle_caps_lock_led
+                .handle_key key_m,memory_test
+                .handle_key key_c,clear_test
+                .handle_key key_p,patterns_test
+                .handle_key key_b,bits_test
+                .handle_key key_0,set_mode_0
+                .handle_key key_4,set_mode_4
+                .handle_key key_7,set_mode_7
+                
+
+                ; delay ~3,000 cycles
                 ldx #0
-clear_fill_loop:
+delay_loop:
+                .rept 10
+                nop
+                .endrept
+                inx
+                bne delay_loop
+
+                iny
+                tya
+                lsr a           ; 07654321
+                lsr a           ; 00765432
+                lsr a           ; 00076543
+                lsr a           ; 00007654
+                and #8
+                ora #6          ; caps lock LED
+                sta system_via.orb
+                eor #8|(6^7)    ; opposite state for shift lock LED
+                sta system_via.orb
+                
+                jmp main_menu_loop
+
+set_mode_0:
+                .set_mode crtc_20KB,palette_mono,$9c
+                .show_crtc_address_in_LEDs
+                jmp main_menu_loop
+
+set_mode_4:
+                .set_mode crtc_10KB,palette_mono,$88
+                .show_crtc_address_in_LEDs
+                jmp main_menu_loop
+
+set_mode_7:
+                .set_mode crtc_teletext,-1,$4a
+                jmp main_menu_loop
+
+;-------------------------------------------------------------------------
+
+bits_test: .proc
+
+fill_00:
+                lda #$00
+fill:
+                ldx #0
+fill_loop:
                 .for _i=0,_i<128,_i+=1
                 sta _i*256,x
                 .endfor
                 inx
+                bne fill_loop
+
+test_loop:
+                handle_key key_space,toggle_address
+                handle_key key_0,toggle_0
+                handle_key key_1,toggle_1
+                handle_key key_2,toggle_2
+                handle_key key_3,toggle_3
+                handle_key key_4,toggle_4
+                handle_key key_5,toggle_5
+                handle_key key_6,toggle_6
+                handle_key key_7,toggle_7
+                handle_key key_8,fill_00
+                handle_key key_9,fill_ff
+                handle_key key_f,fill
+                jmp test_loop
+
+fill_ff:
+                lda #$ff
+                jmp fill
+
+toggle_0:
+                eor #$01
+                jmp fill
+
+toggle_1:
+                eor #$02
+                jmp fill
+
+toggle_2:
+                eor #$04
+                jmp fill
+
+toggle_3:
+                eor #$08
+                jmp fill
+
+toggle_4:
+                eor #$10
+                jmp fill
+
+toggle_5:
+                eor #$20
+                jmp fill
+
+toggle_6:
+                eor #$40
+                jmp fill
+
+toggle_7:
+                eor #$80
+                jmp fill
+
+
+toggle_address:
+                .cycle_crtc_address
+                .show_crtc_address_in_LEDs
+                jmp test_loop
+               .endproc
+               
+                
+;-------------------------------------------------------------------------
+
+patterns_test: .proc
+                lda #1
+pattern_fill:
+                ldx #0
+pattern_fill_loop:
+                .for _i=0,_i<128,_i+=1
+                sta _i*256,x
+                .endfor
+                cmp #$80
+                rol a
+                inx
+                bne pattern_fill_loop
+
+patterns_test_loop:
+                handle_key key_space,change_address
+                handle_key key_p,rotate_pattern
+                handle_key key_f,pattern_fill
+                jmp patterns_test_loop
+
+rotate_pattern:
+                cmp #$80
+                rol a
+                jmp pattern_fill
+
+change_address:
+                .cycle_crtc_address
+                .show_crtc_address_in_LEDs
+                jmp patterns_test_loop
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+clear_test:
+                lda #0
+                sta $fe34       ; shadow ram off
+                ; lda #$80
+                ; sta $fe30       ; ANDY on
+                ; lda #0
+                ldx #0
+clear_fill_loop:
+                ; ; clear shadow RAM
+                ; ldy #$80
+                ; sty $fe34
+                ; .for _i=$30,_i<$80,_i+=1
+                ; sta _i*256,x
+                ; .endfor
+                ; clear main RAM
+                ; ldy #0
+                ; sty $fe34
+                .for _i=0,_i<128,_i+=1
+                sta _i*256,x
+                .endfor
+                ; ; clear ANDY
+                ; .for _i=$80,_i<$b0,_i+=1
+                ; sta _i*256,x
+                ; .endfor
+                
+                inx
                 bne clear_fill_loop
 
 clear_read_loop:
+                ; constantly read main RAM
                 .for _i=0,_i<128,_i+=1
                 lda _i*256,x
                 .endfor
                 inx
                 jmp clear_read_loop
                 
+;-------------------------------------------------------------------------
 
-memory_test:
-                .set_mode mode7_crtc_values,palette_mono,$4a
-                .set_mode crtc_20KB,palette_mono,$9c
-                
+memory_test: .proc
 test:
                 ldx #0          ; X = pattern index
                 ldy #0          ; Y = page offset
 fill_loop:
                 lda patterns,x
-                
+
                 .for _i=0,_i<128,_i+=1
                 sta _i*256,y
                 .endfor
@@ -179,6 +413,9 @@ fill_loop:
 check_loop:
                 .for _i=0,_i<128,_i+=1
                 lda _i*256,y
+                .if test_mask!=0
+                ora #test_mask
+                .endif
                 cmp patterns,x
                 beq +
 
@@ -201,7 +438,7 @@ error:
                 ; S = page
                 ; Y = page offset
 
-                .set_mode mode7_crtc_values,palette_mono,$4a
+                .set_mode crtc_teletext,-1,$4a
 
                 ldx #0
 cls_loop:
@@ -212,37 +449,43 @@ cls_loop:
                 inx
                 bne cls_loop
 
-                .copy_message address_addr,address_message
+                .copy_message memory_test_messages.address_addr,memory_test_messages.address_message
                 lda msn_digit,y
-                sta address_addr+2,x
+                sta memory_test_messages.address_addr+2,x
                 lda lsn_digit,y
-                sta address_addr+3,x
+                sta memory_test_messages.address_addr+3,x
 
                 txa
                 tay
                 tsx
                 lda msn_digit,x
-                sta address_addr+0,y
+                sta memory_test_messages.address_addr+0,y
                 lda lsn_digit,x
-                sta address_addr+1,y
+                sta memory_test_messages.address_addr+1,y
 
-                .copy_message wanted_addr,wanted_message
+                .copy_message memory_test_messages.wanted_addr,memory_test_messages.wanted_message
                 ldy wanted_byte
                 lda msn_digit,y
-                sta wanted_addr+0,x
+                sta memory_test_messages.wanted_addr+0,x
                 lda lsn_digit,y
-                sta wanted_addr+1,x
+                sta memory_test_messages.wanted_addr+1,x
 
-                .copy_message got_addr,got_message
+                .copy_message memory_test_messages.got_addr,memory_test_messages.got_message
                 ldy got_byte
                 lda msn_digit,y
-                sta got_addr+0,x
+                sta memory_test_messages.got_addr+0,x
                 lda lsn_digit,y
-                sta got_addr+1,x
-
+                sta memory_test_messages.got_addr+1,x
+                .cerror *!=hang ; must fall through
+                .endproc
+                
 hang:
                 jmp hang
 
+;-------------------------------------------------------------------------
+
+memory_test_messages: .block
+                
 address_addr=$7c00+40
 address_message:
                 .shift "Address: &"
@@ -254,6 +497,9 @@ wanted_message:
 got_addr=$7c00+3*40
 got_message:
                 .shift "Got:     &"
+                .endblock
+
+;-------------------------------------------------------------------------
 
 msn_digit:
                 .for _i=0,_i<256,_i+=1
@@ -265,23 +511,29 @@ lsn_digit:
                 .byte format("%X",_i&15)
                 .endfor
 
+;-------------------------------------------------------------------------
+
 patterns: .block
-                .byte $00
-                .for _i:=0,_i<8,_i+=1
-                .byte 1<<_i
-                .byte $00
-                .byte $ff
+                .byte $00|test_mask
+                .for _i=0,_i<8,_i+=1
+                .byte (1<<_i)|test_mask
+                .byte $00|test_mask
+                .byte $ff|test_mask
                 .endfor
-                .byte $aa,0
-                .byte $55,0
+                .byte $aa|test_mask
+                .byte $00|test_mask
+                .byte $55|test_mask
+                .byte $00|test_mask
                 .for _i:=0,_i<8,_i+=1
-                .byte (~(1<<_i))&$ff
-                .byte $00
-                .byte $ff
+                .byte (~(1<<_i))&$ff|test_mask
+                .byte $00|test_mask
+                .byte $ff|test_mask
                 .endfor
                 .endblock
-                
-mode7_crtc_values: .block
+
+;-------------------------------------------------------------------------
+
+crtc_teletext: .block
                 .byte  $3F  ; 0 Horizontal Total     =64
                 .byte  $28  ; 1 Horizontal Displayed =40
                 .byte  $33  ; 2 Horizontal Sync      =&33  Note: &31 is a better value
@@ -298,6 +550,8 @@ mode7_crtc_values: .block
                 .byte $28,$00   ; 14,15 cursor position
                 .endblock
 
+;-------------------------------------------------------------------------
+
 crtc_20KB: .block  ;MODEs 0/1/2
                 .byte $7F            ;R0 - Horizontal Total
                 .byte $50            ;R1 - Horizontal Displayed
@@ -311,16 +565,38 @@ crtc_20KB: .block  ;MODEs 0/1/2
                 .byte $07               ;R9 - Scan lines per character
                 .byte $67;CRTC.R10.blink|CRTC.R10.slowBlink|7 ;R10 - Cursor blink/start
                 .byte 8                    ;R11 - Cursor End
-                .byte $30>>3,0             ;R12,R13 - start address
-                .byte $30>>3,0             ; R14,R15 - cursor position
+                .byte 0,0             ;R12,R13 - start address
+                .byte $10,0;$30>>3,0             ; R14,R15 - cursor position
                 .endblock
-                
+
+;-------------------------------------------------------------------------
+
+crtc_10KB: .block ;MODEs 4/5
+                .byte $3f                 ;R0 - Horizontal Total
+                .byte $28                 ;R1 - Horizontal Displayed
+                .byte $31                 ;R2 - Horizontal Sync
+                .byte $24                 ;R3 - Sync Width (%vvvvhhhh)
+                .byte $26                 ;R4 - Vertical Total
+                .byte $00                 ;R5 - Vertical Total Adjust
+                .byte $20                 ;R6 - Vertical Displayed
+                .byte $22                 ;R7 - Vertical Sync Position
+                .byte 1;CRTC.R8.cursorDelay0|CRTC.R8.displayDelay0|CRTC.R8.interlaceSync ;R8 - Interlace/Delay
+                .byte $07               ;R9 - Scan lines per character
+                .byte $67;CRTC.R10.blink|CRTC.R10.slowBlink|7 ;R10 - Cursor blink/start
+                .byte 8                      ;R11 - Cursor End
+                .byte 0,0               ; R12,R13 - start address
+                .byte $10,0               ; R14,R15 - cursor position
+                .endblock
+
+;-------------------------------------------------------------------------
+
 palette_mono:
                 .for _i=0,_i<16,_i+=1
                 .byte _i<<4|(_i<8?7:0)
                 .endfor
                 
-                
+;-------------------------------------------------------------------------
+
                 .endsection
 
 ;-------------------------------------------------------------------------
