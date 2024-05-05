@@ -45,6 +45,9 @@ Write to EPROM (or similar) and insert in OS ROM socket.
 
 # Use
 
+You'll need a functioning keyboard and system VIA and the system
+ideally needs to be able to produce a display of some kind.
+
 If you are directed to "tap" a key, that means the action will
 not occur until the key is released.
 
@@ -70,6 +73,8 @@ You can tap the following keys:
 
 - M :: main memory test
 
+- M (while holding shift) :: main memory test with ignore bits
+
 - C :: clear memory test
 
 - P :: visual pattern test
@@ -78,14 +83,36 @@ You can tap the following keys:
 
 ## Main memory test (doesn't use RAM)
 
-Constantly fills main RAM with a series of patterns, checking the
-values didn't change when read back. You should see a bunch of
-patterns on screen as it runs. The test runs itself, and if there's an
-error, it will switch to Mode 7 and print a report.
+Lights both LEDs and constantly fills main RAM with a series of
+patterns, checking the values didn't change when read back. You should
+see a bunch of patterns on screen as it runs. The test runs itself,
+and if there's an error, it will switch to Mode 7, switch the LEDs
+off, and print a report.
 
 This does not use RAM for the test. But RAM is used for displaying the
 report, so if things are completely hosed then the report may be
 readable or incorrect.
+
+## Main memory test with ignore bits (doesn't use RAM)
+
+As main memory test, but you can specify a mask value indicating which
+bits to ignore. For example, if bit 4 of memory appears to be bad, you
+can have the test ignore bit 4, to see if the fault is isolated or if
+any other bits are also affected.
+
+(The ordinary main memory test uses a mask of $00.)
+
+When the test starts, both LEDs are off, indicating it's waiting for
+you to enter the mask for the bad bits. Enter it as two hex digits:
+more significant, then less significant. For example, if bit 4 is bad,
+tap `1` then `0`, for $10, aka %00010000.
+
+The caps lock LED will light up after the first digit is entered, then
+shift lock after the second (but hopefully you'll see the test run so
+it'll be obvious).
+
+If a failure report is printed, the values of the ignored bits are
+indeterminate, and you will have to ignore them yourself. Apologies!
 
 ## Clear memory test (doesn't use RAM)
 
@@ -96,7 +123,6 @@ but 0s read from the DRAM.
   
 The test reads $0000, $0100, $0200 ... $7f00, then $0001, $0101 - and
 so on.
-
 
 ## Visual pattern test (doesn't use RAM)
 

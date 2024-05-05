@@ -6,19 +6,16 @@
                 .dsection zp
                 
 *=$c000
-                ; don't put anything in the VDU driver region.
-                brk
+                .dsection lower
+
+                .if *<$e000
 *=$e000
-                .dsection code
+                .endif
+                
+                .dsection upper
                 .cerror *>$fffa,'code overflow'
 *=$fffa
                 .dsection vectors
-
-;-------------------------------------------------------------------------
-
-; value OR'd into all test patterns when read - use to exclude bits
-; known to be bad
-test_mask=0
 
 ;-------------------------------------------------------------------------
 
@@ -122,25 +119,8 @@ got_byte: .fill 0
 ;-------------------------------------------------------------------------
 
 
-                .section code
-nmi_entry_point:
-                rti
-
-irq_entry_point:
-                rti
-
-reset_entry_point:
-                sei
-
-                lda #0
-                .rept 5
-                sta 0
-                .endrept
-
-                lda #0
-                sta $fe30       ; disable ANDY (if B+ or later)
-                sta $fe34       ; select main RAM (if B+ or later)
-
+                .section lower
+reset:
                 ; check if initialisation was (probably) run on a
                 ; previous boot
                 ldx #0          ; not previously initialised
@@ -397,12 +377,77 @@ clear_read_loop:
 ;-------------------------------------------------------------------------
 
 memory_test: .proc
+                ; the T1 latch can act as a handy 16 bits of (slightly
+                ; slow) RAM. IRQs are disabled so it doesn't matter if
+                ; the timer times out more often.
+                lda #0
+                sta system_via.t1l_h
+                
+                ldx #key_shift
+                stx system_via.ora_no_handshake
+                bit system_via.ora_no_handshake
+                bpl test
+
+read_msn:
+                ldx #8+6        ; caps lock off
+                stx system_via.orb
+                ldx #8+7        ; shift lock off
+                stx system_via.orb
+
+                ldx #15
+msn_loop:
+                lda xdigit_keys,x
+                sta system_via.ora_no_handshake
+                bit system_via.ora_no_handshake
+                bpl next_msn_key
+wait_for_msn_key_up:
+                bit system_via.ora_no_handshake
+                bmi wait_for_msn_key_up
+                txa
+                asl a
+                asl a
+                asl a
+                asl a
+                sta system_via.t1l_h
+                jmp read_lsn
+next_msn_key:
+                dex
+                bpl msn_loop
+                jmp read_msn
+
+read_lsn:
+                ldx #0+6        ; caps lock on
+                stx system_via.orb
+
+                ldx #15
+lsn_loop:
+                lda xdigit_keys,x
+                sta system_via.ora_no_handshake
+                bit system_via.ora_no_handshake
+                bpl next_lsn_key
+wait_for_lsn_key_up:
+                bit system_via.ora_no_handshake
+                bmi wait_for_lsn_key_up
+                txa
+                ora system_via.t1l_h
+                sta system_via.t1l_h
+                jmp test
+next_lsn_key:
+                dex
+                bpl lsn_loop
+                jmp read_lsn
+                
 test:
+                ldx #0+6        ; caps lock on
+                stx system_via.orb
+                ldx #0+7        ; shift lock on
+                stx system_via.orb
+                
                 ldx #0          ; X = pattern index
                 ldy #0          ; Y = page offset
 fill_loop:
                 lda patterns,x
-
+                
                 .for _i=0,_i<128,_i+=1
                 sta _i*256,y
                 .endfor
@@ -412,16 +457,15 @@ fill_loop:
 
 check_loop:
                 .for _i=0,_i<128,_i+=1
-                lda _i*256,y
-                .if test_mask!=0
-                ora #test_mask
-                .endif
+                lda patterns,x  ; fetch pattern byte
+                and system_via.t1l_h ; keep ignore bits
+                sta system_via.t1l_l ; temp...
+                lda system_via.t1l_h ; fetch mask byte
+                eor #$ff             ; 0=ignore
+                and _i*256,y         ; get the non-ignore bits
+                ora system_via.t1l_l ; apply pattern bytes
                 cmp patterns,x
                 beq +
-
-                sta got_byte
-                lda patterns,x
-                sta wanted_byte
                 
                 ldx #_i
                 txs             ; S = page
@@ -440,6 +484,11 @@ error:
 
                 .set_mode crtc_teletext,-1,$4a
 
+                ldx #8+6
+                stx system_via.orb
+                ldx #8+7
+                stx system_via.orb
+
                 ldx #0
 cls_loop:
                 sta $7c00,x
@@ -450,8 +499,12 @@ cls_loop:
                 bne cls_loop
 
                 .copy_message memory_test_messages.address_addr,memory_test_messages.address_message
+                tya
                 lda msn_digit,y
                 sta memory_test_messages.address_addr+2,x
+                tya
+                and #15
+                tay
                 lda lsn_digit,y
                 sta memory_test_messages.address_addr+3,x
 
@@ -460,6 +513,9 @@ cls_loop:
                 tsx
                 lda msn_digit,x
                 sta memory_test_messages.address_addr+0,y
+                txa
+                and #15
+                tax
                 lda lsn_digit,x
                 sta memory_test_messages.address_addr+1,y
 
@@ -467,6 +523,9 @@ cls_loop:
                 ldy wanted_byte
                 lda msn_digit,y
                 sta memory_test_messages.wanted_addr+0,x
+                tya
+                and #15
+                tay
                 lda lsn_digit,y
                 sta memory_test_messages.wanted_addr+1,x
 
@@ -474,6 +533,9 @@ cls_loop:
                 ldy got_byte
                 lda msn_digit,y
                 sta memory_test_messages.got_addr+0,x
+                tya
+                and #15
+                tay
                 lda lsn_digit,y
                 sta memory_test_messages.got_addr+1,x
                 .cerror *!=hang ; must fall through
@@ -481,6 +543,8 @@ cls_loop:
                 
 hang:
                 jmp hang
+
+                
 
 ;-------------------------------------------------------------------------
 
@@ -507,27 +571,47 @@ msn_digit:
                 .endfor
 
 lsn_digit:
-                .for _i=0,_i<256,_i+=1
+                .for _i=0,_i<16,_i+=1
                 .byte format("%X",_i&15)
                 .endfor
 
 ;-------------------------------------------------------------------------
 
+xdigit_keys:
+                .byte key_0
+                .byte key_1
+                .byte key_2
+                .byte key_3
+                .byte key_4
+                .byte key_5
+                .byte key_6
+                .byte key_7
+                .byte key_8
+                .byte key_9
+                .byte key_a
+                .byte key_b
+                .byte key_c
+                .byte key_d
+                .byte key_e
+                .byte key_f
+
+;-------------------------------------------------------------------------
+
 patterns: .block
-                .byte $00|test_mask
+                .byte $00
                 .for _i=0,_i<8,_i+=1
-                .byte (1<<_i)|test_mask
-                .byte $00|test_mask
-                .byte $ff|test_mask
+                .byte (1<<_i)
+                .byte $00
+                .byte $ff
                 .endfor
-                .byte $aa|test_mask
-                .byte $00|test_mask
-                .byte $55|test_mask
-                .byte $00|test_mask
+                .byte $aa
+                .byte $00
+                .byte $55
+                .byte $00
                 .for _i:=0,_i<8,_i+=1
-                .byte (~(1<<_i))&$ff|test_mask
-                .byte $00|test_mask
-                .byte $ff|test_mask
+                .byte (~(1<<_i))&$ff
+                .byte $00
+                .byte $ff
                 .endfor
                 .endblock
 
@@ -597,6 +681,35 @@ palette_mono:
                 
 ;-------------------------------------------------------------------------
 
+                .endsection
+
+;-------------------------------------------------------------------------
+
+                .section upper
+nmi_entry_point:
+                rti
+
+reset_entry_point:
+                sei
+                lda #0
+                .rept 5
+                sta 0
+                .endrept
+
+                ; disable ANDY on B+/Master 128
+                lda #0
+                sta $fe30       ; disable ANDY (if B+ or later)
+
+                ; B+: disable shadow RAM
+                ;
+                ; Master: display main RAM; CPU accesses main RAM; OS
+                ; at $c0000
+                sta $fe34       ; select main RAM (if B+ or later)
+                
+                jmp reset
+
+irq_entry_point:
+                rti
                 .endsection
 
 ;-------------------------------------------------------------------------
