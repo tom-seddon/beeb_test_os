@@ -6,13 +6,7 @@
                 .dsection zp
                 
 *=$c000
-                .dsection lower
-
-                .if *<$e000
-*=$e000
-                .endif
-                
-                .dsection upper
+                .dsection code
                 .cerror *>$fffa,'code overflow'
 *=$fffa
                 .dsection vectors
@@ -119,11 +113,24 @@ got_byte: .fill 0
 ;-------------------------------------------------------------------------
 
 
-                .section lower
-reset:
+                .section code
+reset_entry_point:
+                sei
+                lda #0
+                .rept 5
+                sta 0
+                .endrept
+
+                ; disable ANDY on B+
+                lda #0
+                sta $fe30       ; disable ANDY (if B+ or later)
+
+                ; disable shadow RAM on B+
+                sta $fe34       ; select main RAM (if B+ or later)
+                
                 ; check if initialisation was (probably) run on a
                 ; previous boot
-                ldx #0          ; not previously initialised
+                ldy #0          ; not previously initialised
                 lda system_via.ddra
                 cmp #%01111111
                 bne +
@@ -134,13 +141,8 @@ reset:
                 bne +
 
                 ; Looks like this isn't a power-on boot
-                dex
+                dey
 +
-
-                ; Port A keyboard access
-                lda #%01111111
-                sta system_via.ddra
-
                 ; Port B writes to addressable latch
                 lda #%00001111
                 sta system_via.ddrb
@@ -148,6 +150,43 @@ reset:
                 ; Disable port A input latching
                 lda #0
                 sta system_via.acr
+
+                ; Disable sound write, speech read, speech write,
+                ; keyboard write.
+                ldx #8+0
+                stx system_via.orb ; bit 0 - sound write
+                inx
+                stx system_via.orb ; bit 1 - speech read
+                inx
+                stx system_via.orb ; bit 2 - speech write
+                inx
+                stx system_via.orb ; bit 3 - keyboard write
+
+                ; Silence sound
+                lda #%10011111  ; tone 3 max attenuation
+silence_sound_loop:
+                ldx #$ff
+                stx system_via.ddra
+                sta system_via.ora_no_handshake
+                ldx #0+0
+                stx system_via.orb
+                nop
+                nop
+                nop
+                nop
+                nop
+                nop
+                nop
+                nop
+                ldx #8+0
+                stx system_via.orb
+                clc
+                adc #%00100000  ; next channel
+                bcc silence_sound_loop
+
+                ; Port A keyboard access
+                lda #%01111111
+                sta system_via.ddra
 
                 lda #8+0        ; disable sound write
                 sta system_via.orb
@@ -175,7 +214,7 @@ reset:
                 .endrept
 
                 ; Only initialise mode on a power-on reset
-                cpx #0
+                cpy #0
                 bne +
                 .set_mode crtc_teletext,-1,$4a
 +
@@ -185,12 +224,11 @@ main_menu:
 main_menu_loop:
                 ; .handle_key key_caps_lock,toggle_caps_lock_led
                 .handle_key key_m,memory_test
-                .handle_key key_c,clear_test
-                .handle_key key_p,patterns_test
                 .handle_key key_b,bits_test
                 .handle_key key_0,set_mode_0
                 .handle_key key_4,set_mode_4
                 .handle_key key_7,set_mode_7
+                .handle_key key_e,teletext_engineering_test
                 
 
                 ; delay ~3,000 cycles
@@ -225,6 +263,18 @@ set_mode_4:
                 .set_mode crtc_10KB,palette_mono,$88
                 .show_crtc_address_in_LEDs
                 jmp main_menu_loop
+
+teletext_engineering_test:
+                ldx #0
+-
+                .for _i=0,_i<4,_i+=1
+                lda engtest+_i*256,x
+                sta $7c00+_i*256,x
+                .endfor
+                inx
+                bne -
+                
+                .cerror *!=set_mode_7 ; fall through
 
 set_mode_7:
                 .set_mode crtc_teletext,-1,$4a
@@ -296,83 +346,11 @@ toggle_7:
                 eor #$80
                 jmp fill
 
-
 toggle_address:
                 .cycle_crtc_address
                 .show_crtc_address_in_LEDs
                 jmp test_loop
                .endproc
-               
-                
-;-------------------------------------------------------------------------
-
-patterns_test: .proc
-                lda #1
-pattern_fill:
-                ldx #0
-pattern_fill_loop:
-                .for _i=0,_i<128,_i+=1
-                sta _i*256,x
-                .endfor
-                cmp #$80
-                rol a
-                inx
-                bne pattern_fill_loop
-
-patterns_test_loop:
-                handle_key key_space,change_address
-                handle_key key_p,rotate_pattern
-                handle_key key_f,pattern_fill
-                jmp patterns_test_loop
-
-rotate_pattern:
-                cmp #$80
-                rol a
-                jmp pattern_fill
-
-change_address:
-                .cycle_crtc_address
-                .show_crtc_address_in_LEDs
-                jmp patterns_test_loop
-                .endproc
-                
-;-------------------------------------------------------------------------
-
-clear_test:
-                lda #0
-                sta $fe34       ; shadow ram off
-                ; lda #$80
-                ; sta $fe30       ; ANDY on
-                ; lda #0
-                ldx #0
-clear_fill_loop:
-                ; ; clear shadow RAM
-                ; ldy #$80
-                ; sty $fe34
-                ; .for _i=$30,_i<$80,_i+=1
-                ; sta _i*256,x
-                ; .endfor
-                ; clear main RAM
-                ; ldy #0
-                ; sty $fe34
-                .for _i=0,_i<128,_i+=1
-                sta _i*256,x
-                .endfor
-                ; ; clear ANDY
-                ; .for _i=$80,_i<$b0,_i+=1
-                ; sta _i*256,x
-                ; .endfor
-                
-                inx
-                bne clear_fill_loop
-
-clear_read_loop:
-                ; constantly read main RAM
-                .for _i=0,_i<128,_i+=1
-                lda _i*256,x
-                .endfor
-                inx
-                jmp clear_read_loop
                 
 ;-------------------------------------------------------------------------
 
@@ -678,35 +656,18 @@ palette_mono:
                 .for _i=0,_i<16,_i+=1
                 .byte _i<<4|(_i<8?7:0)
                 .endfor
+
+;-------------------------------------------------------------------------
+
+engtest:
+                .binary "engtest.dat"
                 
 ;-------------------------------------------------------------------------
 
-                .endsection
-
-;-------------------------------------------------------------------------
-
-                .section upper
 nmi_entry_point:
                 rti
 
-reset_entry_point:
-                sei
-                lda #0
-                .rept 5
-                sta 0
-                .endrept
-
-                ; disable ANDY on B+/Master 128
-                lda #0
-                sta $fe30       ; disable ANDY (if B+ or later)
-
-                ; B+: disable shadow RAM
-                ;
-                ; Master: display main RAM; CPU accesses main RAM; OS
-                ; at $c0000
-                sta $fe34       ; select main RAM (if B+ or later)
-                
-                jmp reset
+;-------------------------------------------------------------------------
 
 irq_entry_point:
                 rti

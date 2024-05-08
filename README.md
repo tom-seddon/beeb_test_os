@@ -1,6 +1,6 @@
-Test OS for diagnosing problems with BBC B/B+.
-
-May also work on Master 128/Master Compact.
+Test OS for diagnosing basic problems with BBC B/B+. Tests the 32 KB
+of main RAM that the OS needs to boot. Also exercises the system VIA
+to a limited extent.
 
 # Build
 
@@ -45,22 +45,25 @@ Write to EPROM (or similar) and insert in OS ROM socket.
 
 # Use
 
-You'll need a functioning keyboard and system VIA and the system
-ideally needs to be able to produce a display of some kind.
+You'll need a functioning keyboard and system VIA. The system ideally
+needs to be able to produce a display of some kind - some basic
+testing is posible without (the keyboard LEDs do show some
+information) but you don't get much info that way.
 
 If you are directed to "tap" a key, that means the action will
 not occur until the key is released.
 
 Some tests are marked as not using RAM: this means these tests don't
-need functioning CPU access to RAM to operate. Other tests rely on RAM
-behaving properly and there may be spurious errors if not.
+need functioning RAM to operate. Other tests rely on RAM behaving
+properly and there may be spurious errors if not.
 
 Power on BBC Micro.
 
 On startup, the test OS does 5 writes of $00 to address $0000, does
-some minimal system initialisation, then does 10 writes of $00 to
-address $0000. (If following along, watch CPU A15 and CPU A8 - all
-other writes on startup should be to the I/O region.)
+some minimal system initialisation (including attempting to silence
+the sound), then does 10 writes of $00 to address $0000. (If following
+along, watch CPU A15 and CPU A8 - all other writes on startup should
+be to the I/O region.)
 
 If this is a power-on reset, it selects mode 7.
 
@@ -75,11 +78,9 @@ You can tap the following keys:
 
 - M (while holding shift) :: main memory test with ignore bits
 
-- C :: clear memory test
-
-- P :: visual pattern test
-
 - B :: visual bits test
+
+- E :: engineering test
 
 ## Main memory test (doesn't use RAM)
 
@@ -91,7 +92,7 @@ off, and print a report.
 
 This does not use RAM for the test. But RAM is used for displaying the
 report, so if things are completely hosed then the report may be
-readable or incorrect.
+unreadable or incorrect.
 
 ## Main memory test with ignore bits (doesn't use RAM)
 
@@ -114,34 +115,12 @@ it'll be obvious).
 If a failure report is printed, the values of the ignored bits are
 indeterminate, and you will have to ignore them yourself. Apologies!
 
-## Clear memory test (doesn't use RAM)
-
-Clear main RAM to all $00, and go into infinite loop of reading all of
-main RAM. This doesn't perform any checks on the values read; it's
-intended for use with a logic analyzer, which should report nothing
-but 0s read from the DRAM.
-  
-The test reads $0000, $0100, $0200 ... $7f00, then $0001, $0101 - and
-so on.
-
-## Visual pattern test (doesn't use RAM)
-
-Writes a pattern to all 32 KB of main RAM, then shows it on screen.
-
-Tap P to adjust the pattern.
-
-Tap F to refill memory with the existing pattern.
-
-Tap SPACE to adjust the screen address (see below).
-
 ## Visual bits test (doesn't use RAM)
 
-Similar to the visual pattern test, but you can select the value
-written.
+Writes a configurable value - initially zero - to all 32 KB of main
+RAM, so you can see the effect on screen.
 
 Tap F to refill memory with the existing value.
-
-Tap SPACE to adjust the screen address (see below).
 
 Tap 0, 1, 2, 3, 4, 5, 6 or 7 to toggle that bit in the fill value.
 
@@ -149,11 +128,9 @@ Tap 8 to fill memory with $00.
 
 Tap 9 to fill memory with $ff.
 
-## Screen start address
-
-Some tests let you select the screen start address when in mode 0 or
-mode 4 (the mode 7 address is fixed). The start address is indicated
-by the caps lock/shift lock LEDs.
+In mode 0 or 4, tap SPACE to adjust the screen address. (The start
+address in mode 7 is fixed.) The address is indicated by the caps
+lock/shift lock LEDs:
 
 | Caps | Shift | Base |
 | --- | --- | --- |
@@ -164,4 +141,8 @@ by the caps lock/shift lock LEDs.
   
 If the screen wraps round (e.g., displaying Mode 0 starting at $4000),
 the flashing cursor indicates where the wraparound back to $3000
-occurred. (The wraparound size is always 20 KB.)
+occurred. The wraparound size is always 20 KB.
+
+## Engineering test
+
+Selects mode 7 and shows the Ceefax engineering test page.
