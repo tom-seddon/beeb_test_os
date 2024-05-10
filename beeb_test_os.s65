@@ -2,9 +2,6 @@
 
 ;-------------------------------------------------------------------------
 
-*=0
-                .dsection zp
-                
 *=$c000
                 .dsection code
                 .cerror *>$fffa,'code overflow'
@@ -98,17 +95,7 @@ show_crtc_address_in_LEDs: .macro
                 ora #6          ; do caps lock LED
                 sta system_via.orb
                 .endmacro
-                
-;-------------------------------------------------------------------------
 
-                .section zp
-
-                ; These values are not guaranteed to be correct, of
-                ; course, if the memory is borked! But what else can
-                ; you do?
-wanted_byte: .fill 0
-got_byte: .fill 0
-                .endsection
                 
 ;-------------------------------------------------------------------------
 
@@ -459,6 +446,12 @@ check_loop:
 error:
                 ; S = page
                 ; Y = page offset
+                ; A = got byte
+                ; patterns,x = wanted byte
+
+                sta system_via.t1l_l ; wanted byte
+                lda patterns,x
+                sta system_via.t1l_h ; got byte
 
                 .set_mode crtc_teletext,-1,$4a
 
@@ -498,7 +491,7 @@ cls_loop:
                 sta memory_test_messages.address_addr+1,y
 
                 .copy_message memory_test_messages.wanted_addr,memory_test_messages.wanted_message
-                ldy wanted_byte
+                ldy system_via.t1l_l
                 lda msn_digit,y
                 sta memory_test_messages.wanted_addr+0,x
                 tya
@@ -508,7 +501,7 @@ cls_loop:
                 sta memory_test_messages.wanted_addr+1,x
 
                 .copy_message memory_test_messages.got_addr,memory_test_messages.got_message
-                ldy got_byte
+                ldy system_via.t1l_h
                 lda msn_digit,y
                 sta memory_test_messages.got_addr+0,x
                 tya
