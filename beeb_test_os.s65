@@ -458,7 +458,7 @@ fill_loop:
                 iny
                 bne fill_loop
 
-check_loop:
+test_loop:
                 .for _i=0,_i<128,_i+=1
                 lda patterns,x  ; fetch pattern byte
                 and system_via.t1l_h ; keep ignore bits
@@ -476,9 +476,13 @@ check_loop:
 +
                 .endfor
 
+                iny
+                bne test_loop
+                
                 inx
                 cpx #size(patterns)
                 bne fill_loop
+
                 jmp test
 
 error:
