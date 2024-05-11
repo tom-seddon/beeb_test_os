@@ -441,12 +441,25 @@ next_lsn_key:
                 jmp read_lsn
                 
 test:
+                ; There's no keyboard input from this point, so the
+                ; system VIA ACR is available for use.
+
+                ldx #0          ; per-byte increment
+                sta system_via.acr
+
+
+                ; 
+                
                 ldx #0+6        ; caps lock on
                 stx system_via.orb
                 ldx #0+7        ; shift lock on
                 stx system_via.orb
+
+test_loop:
                 
-                ldx #0          ; X = pattern index
+                ldx #0
+                txs             ; loop cunter
+                
                 ldy #0          ; Y = page offset
 fill_loop:
                 lda patterns,x
@@ -455,10 +468,17 @@ fill_loop:
                 sta _i*256,y
                 .endfor
 
+                clc
+                txa
+                adc system_via.acr
+                and #size(patterns)-1
+                tax
+                
                 iny
                 bne fill_loop
 
-test_loop:
+                tsx
+check_loop:
                 .for _i=0,_i<128,_i+=1
                 lda patterns,x  ; fetch pattern byte
                 and system_via.t1l_h ; keep ignore bits
@@ -467,7 +487,7 @@ test_loop:
                 eor #$ff             ; 0=ignore
                 and _i*256,y         ; get the non-ignore bits
                 ora system_via.t1l_l ; apply pattern bytes
-                cmp patterns,x
+                eor patterns,x       ; acquire difference
                 beq +
                 
                 ldx #_i
@@ -476,24 +496,30 @@ test_loop:
 +
                 .endfor
 
+                clc
+                txa
+                adc system_via.acr
+                and #size(patterns)-1
+                tax
+
                 iny
-                bne test_loop
-                
-                inx
+                bne check_loop
+
+                pla             ; inc S
+                tsx
                 cpx #size(patterns)
                 bne fill_loop
 
-                jmp test
+                inc system_via.acr
+                
+                jmp test_loop
 
 error:
                 ; S = page
                 ; Y = page offset
-                ; A = got byte
-                ; patterns,x = wanted byte
+                ; A = incorrect bits
 
-                eor patterns,x
                 sta system_via.t1l_l ; incorrect bits
-
                 sty system_via.t1l_h ; page offset
                 
                 .set_mode crtc_teletext,-1,$4a
@@ -571,37 +597,36 @@ xdigit_keys:
 
 ;-------------------------------------------------------------------------
 
-patterns_reset: .segment reset
-                .if \reset!=0
-                .byte $00
-                .byte $ff
-                .endif
+pattern: .segment value
+                .byte (\value)&$ff
+                .byte (\value)&$ff^$ff
                 .endsegment
 
 patterns: .block
-                .for _reset:=0,_reset<2,_reset+=1
-                .byte $00
+                ; .byte 1,2,4,8,16,32,64,128
+                
+                .pattern %00000000
+                .pattern %01010101
+                .pattern %00110011
+                
+                ; 5 bytes from random.org
+                .pattern $a2
+                .pattern $37
+                .pattern $38
+                .pattern $a5
+                .pattern $57 
+                
                 .for _i=0,_i<8,_i+=1
-                .byte (1<<_i)
-                .patterns_reset _reset
+                .pattern (1<<_i)
                 .endfor
-                .byte $aa
-                .patterns_reset _reset
-                .byte $55
-                .patterns_reset _reset
-                .for _i:=0,_i<8,_i+=1
-                .byte (~(1<<_i))&$ff
-                .patterns_reset _reset
+                .for _i=0,_i<8,_i+=1
+                .pattern ($ff<<_i)
                 .endfor
-                .for _i:=0,_i<8,_i+=1
-                .byte ($ff<<_i)&$ff
-                .patterns_reset _reset
+                .for _i=0,_i<8,_i+=1
+                .pattern ($ff>>_i)
                 .endfor
-                .for _i:=0,_i<8,_i+=1
-                .byte $ff>>_i
-                .patterns_reset _reset
-                .endfor
-                .endfor
+                
+                .cerror ((*-patterns)&(*-patterns-1))!=0,format('not power of 2: %d',*-patterns)
                 .endblock
 
 ;-------------------------------------------------------------------------
