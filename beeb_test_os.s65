@@ -16,11 +16,15 @@ FILL_CHAR=$ff
 model_b=false
 model_bplus=false
 model_master=false
+master_first_sideways_ram_bank=4
+master_num_sideways_ram_banks=4
                 .endweak
 
                 .if (model_b?1:0)+(model_bplus?1:0)+(model_master?1:0)!=1
                 .error "must specify single model type"
                 .endif
+
+master_test_sideways_ram=master_num_sideways_ram_banks>0
 
 ;-------------------------------------------------------------------------
 
@@ -446,12 +450,17 @@ toggle_address:
 
 ; Page numbers:
 
-; Range       B         B+          Master
-; -----       -         --          ------
-; $00 - $7F   Main RAM
-; $80 - $90   -         ANDY        ANDY
-; $A0 - $AF   -         ANDY        HAZEL
-; $B0 - $FF   -         Shadow RAM  Shadow RAM
+; Range         B         B+          Master
+; -----         -         --          ------
+;  $00 -  $7F   Main RAM
+;  $80 -  $90   -         ANDY        ANDY
+;  $A0 -  $AF   -         ANDY        HAZEL
+;  $B0 -  $FF   -         Shadow RAM  Shadow RAM
+; $180 - $1BF   -         -           Sideways RAM
+;
+; The sideways RAM bank being tested is not part of the page number.
+; It's read from ROMSEL (hence lack of equivalent B+128
+; functionality).
                 
 test_page_address: .function page
                 .if page>=0&&page<$80
@@ -473,6 +482,8 @@ _addr=page*256
                 ; code accessing this region should be placed elsewhere!
                 .cerror *>=$c000&&*<$e000
 _addr=$c000+(page-$90)*256
+                .elsif model_master&&page>=$180&&page<$1c0
+_addr=(page&$ff)*256
                 .else
                 .error format("invalid page number: $%02x (%d)",page,page)
                 .endif
@@ -488,8 +499,8 @@ test_check_iteration: .segment page
                 eor patterns,x                 ; get differences from pattern
                 and system_via.t1l_h           ; mask out ignore bits
                 beq +
-                
-                ldx #\page
+
+                ldx #(\page)&$ff
                 jmp error
 +
                 .endsegment
@@ -570,12 +581,6 @@ test:
                 ldx #0+7        ; shift lock on
                 stx system_via.orb
 
-                .if model_bplus||model_master
-                ; enable ANDY
-                lda #$80
-                sta romsel
-                .endif
-
                 .if model_master
                 ; page in HAZEL
                 .cerror *>=$c000&&*<$e000
@@ -590,6 +595,12 @@ test_loop:
                 
                 ldy #0          ; Y = page offset
 fill_loop:
+                .if model_bplus||model_master
+                ; enable ANDY and select bank 0
+                lda #$80
+                sta romsel
+                .endif
+
                 lda patterns,x
 
                 ; fill main RAM                
@@ -614,6 +625,24 @@ fill_loop:
 
                 .endif
 
+                .if model_master&&master_test_sideways_ram
+
+                ; fill banks 4-7. Also disable ANDY
+                lda #master_first_sideways_ram_bank
+                sta romsel
+rom_fill_loop:
+                lda patterns,x
+                .for _i=$180,_i<$1c0,_i+=1
+                .test_fill_iteration _i
+                .endfor
+
+                inc romsel
+                lda romsel
+                cmp #master_first_sideways_ram_bank+master_num_sideways_ram_banks
+                bne rom_fill_loop
+
+                .endif
+
                 clc
                 txa
                 adc system_via.acr
@@ -625,6 +654,12 @@ fill_loop:
 
                 tsx
 check_loop:
+                .if model_bplus||model_master
+                ; enable ANDY and select bank 0
+                lda #$80
+                sta romsel
+                .endif
+                
                 .for _i=0,_i<$80,_i+=1
                 .test_check_iteration _i
                 .endfor
@@ -643,6 +678,23 @@ check_loop:
                 .endfor
                 .deactivate_shadow
 
+                .endif
+
+                .if model_master&&master_test_sideways_ram
+
+                ; check banks 4-7. Also disable ANDY
+                lda #master_first_sideways_ram_bank
+                sta romsel
+rom_check_loop:
+                .for _i=$180,_i<$1c0,_i+=1
+                .test_check_iteration _i
+                .endfor
+
+                inc romsel
+                lda romsel
+                cmp #master_first_sideways_ram_bank+master_num_sideways_ram_banks
+                bne rom_check_loop
+                
                 .endif
 
                 clc
@@ -699,16 +751,24 @@ cls_loop:
                 bne cls_loop
 
                 ; Problem address
+                .if model_master
+                lda romsel
+                and #$0f
+                .draw_lsn_glyph mode_7_addr(0,0)
+addr_x=8
+                .else
+addr_x=0
+                .endif
                 tsx
                 txa
-                .draw_msn_glyph mode_7_addr(0,0)
+                .draw_msn_glyph mode_7_addr(addr_x+0,0)
                 tsx
                 txa
-                .draw_msn_glyph mode_7_addr(8,0)
+                .draw_lsn_glyph mode_7_addr(addr_x+8,0)
                 lda system_via.t1l_h
-                .draw_msn_glyph mode_7_addr(16,0)
+                .draw_msn_glyph mode_7_addr(addr_x+16,0)
                 lda system_via.t1l_h
-                .draw_lsn_glyph mode_7_addr(24,0)
+                .draw_lsn_glyph mode_7_addr(addr_x+24,0)
 
                 ; Problem bits
                 lda system_via.t1l_l

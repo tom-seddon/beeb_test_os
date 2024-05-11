@@ -35,11 +35,20 @@ Type `make` from the root of the working copy.
 
 The build process is supposed to be silent when there are no errors.
 
-The output is two 16 KB ROMs:
+The output is six 16 KB ROMs. There are 3 standard versions
 
-* `build/beeb_test_os.b.bin` - BBC B/B+ version
-* `build/beeb_test_os.bplus.bin` - BBC B+ version
-* `build/beeb_test_os.master.bin` - BBC Master version
+* `build/beeb_test_os.b.bin` - BBC B/B+/B+128 version (tests 32 KB main RAM)
+* `build/beeb_test_os.bplus.bin` - BBC B+ version (tests 64 KB RAM)
+* `build/beeb_test_os.master.bin` - BBC Master version (tests 128 KB RAM)
+
+There are 3 additional BBC Master versions, that test some subset of
+the onboard sideways RAM banks. You might want to use these if you
+have paged ROMs installed that are blocking access to the sideways
+RAM.
+
+* `build/beeb_test_os.master.sw45.bin` - tests banks 4 and 5 only
+* `build/beeb_test_os.master.sw67.bin` - tests banks 6 and 7 only
+* `build/beeb_test_os.master.swno.bin` - does not test sideways RAM
 
 # Installation
 
@@ -95,9 +104,9 @@ and if there's an error, it will switch to Mode 7, switch the LEDs
 off, and print a report.
 
 The error report consists of two rows of large text. The first row
-shows the problem address (4 hex digits - see below), and the second
-row is a mask indicating which bits were found to be incorrect (2 hex
-digits).
+shows the problem address (4 or 5 hex digits - see below), and the
+second row is a mask indicating which bits were found to be incorrect
+(2 hex digits).
 
 This does not use RAM for the test, but RAM is necessarily used to
 display the report. The report is intended to be somewhat resistant to
@@ -105,10 +114,10 @@ stuck bits or noise, but no guarantees.
 
 ### Memory test addresses
 
-Addresses shown on BBC B will be 0000-7fff, indicating the problem
-address in main RAM.
+Addresses shown on BBC B will be 4 digits, 0000-7fff, indicating the
+problem address in main RAM.
 
-For B+, the addresses relate to the CPU addresses as follows:
+For B+, the 4-digit addresses relate to the CPU addresses as follows:
 
 | Addresses | Region |
 | --- | --- |
@@ -116,14 +125,18 @@ For B+, the addresses relate to the CPU addresses as follows:
 | 8000-afff | 12 KB extra B+ RAM |
 | b000-ffff | 20 KB shadow RAM |
 
-For Master:
+For Master, the 5-digit addresses are as follows:
 
 | Addresses | Region |
 | --- | --- |
-| 0000-7fff | 32 KB main RAM |
-| 8000-8fff | 4 KB ANDY |
-| 9000-afff | 8 KB HAZEL |
-| b000-ffff | 20 KB shadow RAM |
+| 00000-07fff | 32 KB main RAM |
+| 08000-08fff | 4 KB ANDY |
+| 09000-0afff | 8 KB HAZEL |
+| 0b000-0ffff | 20 KB shadow RAM |
+| 48000-4bfff | 16 KB sideways RAM bank 4 (if tested) |
+| 58000-5bfff | 16 KB sideways RAM bank 5 (if tested) |
+| 68000-6bfff | 16 KB sideways RAM bank 6 (if tested) |
+| 78000-7bfff | 16 KB sideways RAM bank 7 (if tested) |
 
 ## Main memory test with ignore bits (doesn't use RAM)
 
