@@ -1,4 +1,4 @@
-Test OS for diagnosing basic problems with BBC B/B+. 
+Test OS for diagnosing basic problems with BBC B/B+/Master.
 
 # Build
 
@@ -39,6 +39,7 @@ The output is two 16 KB ROMs:
 
 * `build/beeb_test_os.b.bin` - BBC B/B+ version
 * `build/beeb_test_os.bplus.bin` - BBC B+ version
+* `build/beeb_test_os.master.bin` - BBC Master version
 
 # Installation
 
@@ -107,12 +108,21 @@ stuck bits or noise, but no guarantees.
 Addresses shown on BBC B will be 0000-7fff, indicating the problem
 address in main RAM.
 
-For B+, there are 3 separate regions:
+For B+, the addresses relate to the CPU addresses as follows:
 
 | Addresses | Region |
 | --- | --- |
 | 0000-7fff | 32 KB main RAM |
 | 8000-afff | 12 KB extra B+ RAM |
+| b000-ffff | 20 KB shadow RAM |
+
+For Master:
+
+| Addresses | Region |
+| --- | --- |
+| 0000-7fff | 32 KB main RAM |
+| 8000-8fff | 4 KB ANDY |
+| 9000-afff | 8 KB HAZEL |
 | b000-ffff | 20 KB shadow RAM |
 
 ## Main memory test with ignore bits (doesn't use RAM)
@@ -135,7 +145,7 @@ combined mask for further tests should be. Apologies!
 
 Writes a configurable value - initially zero - to all 32 KB of main
 RAM, so you can see the effect on screen. (This only affects main RAM.
-B+ Shadow RAM is not filled.)
+Extra RAM on B+ or Master is not filled.)
 
 Tap F to refill memory with the existing value.
 

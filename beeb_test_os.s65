@@ -1,3 +1,4 @@
+
                 .include "submodules/beeb/include/beeb.s65"
 
 ;-------------------------------------------------------------------------
@@ -14,15 +15,19 @@ FILL_CHAR=$ff
                 .weak
 model_b=false
 model_bplus=false
+model_master=false
                 .endweak
 
-                .if !model_b&&!model_bplus
-                .error "must specify model type"
+                .if (model_b?1:0)+(model_bplus?1:0)+(model_master?1:0)!=1
+                .error "must specify single model type"
                 .endif
-                
+
 ;-------------------------------------------------------------------------
 
 *=$c000
+
+                .if model_b||model_bplus
+
                 ; For B+, memory test needs to go first, as the shadow
                 ; RAM loads/stores need to be in the MOS VDU driver
                 ; area at $c000-$dfff.
@@ -30,7 +35,26 @@ model_bplus=false
                 .dsection user_interface
                 .dsection bits_test
                 .dsection data
-                .dsection dummy_entry_points
+                .dsection memory_test_patterns
+
+                .elif model_master
+
+                .dsection user_interface
+                .dsection bits_test
+                .dsection data
+
+                ; For Master, memory test wants to go last, as it has
+                ; to be out of the way of HAZEL.
+                .if *<$e000
+*=$e000
+                .endif
+                .dsection memory_test
+                .dsection memory_test_patterns
+                
+                .endif
+                
+                .dsection entry_points
+                
                 .cerror *>$fffa,'code overflow'
 *=$fffa
                 .dsection vectors
@@ -158,30 +182,31 @@ activate_shadow: .macro
                 .if model_bplus
                 lda #$80
                 sta acccon
+                .elif model_master
+                lda #acccon.x
+                tsb acccon
                 .else
-                .error
+                .cerror
                 .endif
                 .endmacro
 
-; Preserves X/Y/C
 deactivate_shadow: .macro
                 .if model_bplus
+; Preserves X/Y/C
                 lda #$00
                 sta acccon
+                .elif model_master
+                lda #acccon.x
+                trb acccon
                 .else
-                .error
+                .cerror
                 .endif
                 .endmacro
                 
 ;-------------------------------------------------------------------------
 
                 .section user_interface
-reset_entry_point:
-                sei
-                lda #0
-                .rept 5
-                sta 0
-                .endrept
+reset:
 
                 ; disable ANDY on B+
                 lda #0
@@ -434,14 +459,22 @@ test_page_address: .function page
 _addr=page*256
                 .elsif model_bplus&&page>=$80&&page<$b0
 _addr=page*256
-                .elsif model_bplus&&page>=$b0&&page<$100
+                .elsif (model_bplus||model_master)&&page>=$b0&&page<$100
+                .if model_bplus
                 ; access to this region is only possible from
                 ; instructions fetched from a particular address
                 ; range.
                 .cerror !(*>=$c000&&*<$e000)
+                .endif
 _addr=(page-($b0-$30))*256
+                .elsif model_master&&page>=$80&&page<$90
+_addr=page*256
+                .elsif model_master&&page>=$90&&page<$b0
+                ; code accessing this region should be placed elsewhere!
+                .cerror *>=$c000&&*<$e000
+_addr=$c000+(page-$90)*256
                 .else
-                .cerror format("invalid page number: $%02x (%d)",page,page)
+                .error format("invalid page number: $%02x (%d)",page,page)
                 .endif
                 .endfunction _addr
                 
@@ -537,10 +570,17 @@ test:
                 ldx #0+7        ; shift lock on
                 stx system_via.orb
 
-                .if model_bplus
+                .if model_bplus||model_master
                 ; enable ANDY
                 lda #$80
                 sta romsel
+                .endif
+
+                .if model_master
+                ; page in HAZEL
+                .cerror *>=$c000&&*<$e000
+                lda #acccon.y
+                tsb acccon
                 .endif
 
 test_loop:
@@ -557,8 +597,8 @@ fill_loop:
                 .test_fill_iteration _i
                 .endfor
 
-                .if model_bplus
-
+                .if model_bplus||model_master
+                
                 ; fill ANDY
                 .for _i=$80,_i<$b0,_i+=1
                 .test_fill_iteration _i
@@ -589,7 +629,7 @@ check_loop:
                 .test_check_iteration _i
                 .endfor
 
-                .if model_bplus
+                .if model_bplus||model_master
 
                 ; check ANDY
                 .for _i=$80,_i<$b0,_i+=1
@@ -632,8 +672,13 @@ error:
                 sta system_via.t1l_l ; incorrect bits
                 sty system_via.t1l_h ; page offset
 
-                .if model_bplus
+                .if model_bplus||model_master
                 .deactivate_shadow
+                .endif
+
+                .if model_master
+                lda #acccon.y
+                trb acccon
                 .endif
                 
                 .set_mode crtc_teletext,-1,$4a
@@ -681,39 +726,7 @@ hang:
 
 ;-------------------------------------------------------------------------
 
-                .section data
-msn_digit:
-                .for _i=0,_i<256,_i+=1
-                .byte format("%X",_i>>4)
-                .endfor
-
-lsn_digit:
-                .for _i=0,_i<16,_i+=1
-                .byte format("%X",_i&15)
-                .endfor
-
-;-------------------------------------------------------------------------
-
-xdigit_keys:
-                .byte key_0
-                .byte key_1
-                .byte key_2
-                .byte key_3
-                .byte key_4
-                .byte key_5
-                .byte key_6
-                .byte key_7
-                .byte key_8
-                .byte key_9
-                .byte key_a
-                .byte key_b
-                .byte key_c
-                .byte key_d
-                .byte key_e
-                .byte key_f
-
-;-------------------------------------------------------------------------
-
+                .section memory_test_patterns
 pattern: .segment value
                 .byte (\value)&$ff
                 .byte (\value)&$ff^$ff
@@ -745,6 +758,40 @@ patterns: .block
                 
                 .cerror ((*-patterns)&(*-patterns-1))!=0,format('not power of 2: %d',*-patterns)
                 .endblock
+                .endsection
+                
+;-------------------------------------------------------------------------
+
+                .section data
+msn_digit:
+                .for _i=0,_i<256,_i+=1
+                .byte format("%X",_i>>4)
+                .endfor
+
+lsn_digit:
+                .for _i=0,_i<16,_i+=1
+                .byte format("%X",_i&15)
+                .endfor
+
+;-------------------------------------------------------------------------
+
+xdigit_keys:
+                .byte key_0
+                .byte key_1
+                .byte key_2
+                .byte key_3
+                .byte key_4
+                .byte key_5
+                .byte key_6
+                .byte key_7
+                .byte key_8
+                .byte key_9
+                .byte key_a
+                .byte key_b
+                .byte key_c
+                .byte key_d
+                .byte key_e
+                .byte key_f
 
 ;-------------------------------------------------------------------------
 
@@ -823,7 +870,25 @@ engtest:
                 
 ;-------------------------------------------------------------------------
 
-                .section dummy_entry_points
+                .section entry_points
+
+reset_entry_point:
+                sei
+                lda #0
+                .rept 5
+                sta 0
+                .endrept
+
+                .if model_master
+                ; Can't really avoid resetting this completely, as if
+                ; TST is set then the value read is junk.
+                stz acccon
+                .endif
+                
+                jmp reset
+
+;-------------------------------------------------------------------------
+
 nmi_entry_point:
                 rti
 

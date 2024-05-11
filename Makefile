@@ -19,7 +19,7 @@ _V:=@
 _TASSQ:=-q
 endif
 
-TASS:="$(TASSCMD)" --m65xx -C -Wall --line-numbers $(_TASSQ) --verbose-list --long-branch
+TASS:="$(TASSCMD)" -C -Wall --line-numbers $(_TASSQ) --verbose-list --long-branch
 SHELLCMD:=$(PYTHON) $(realpath submodules/shellcmd.py/shellcmd.py)
 BUILD:=$(abspath ./build)
 
@@ -29,8 +29,9 @@ BUILD:=$(abspath ./build)
 .PHONY:build
 build: _folders
 	$(_V)$(PYTHON) glyphs_data.py > "$(BUILD)/glyphs_data.generated.s65"
-	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_b=true --nostart "--list=$(BUILD)/beeb_test_os.b.lst" "--output=$(BUILD)/beeb_test_os.b.bin"
-	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_bplus=true --nostart "--list=$(BUILD)/beeb_test_os.bplus.lst" "--output=$(BUILD)/beeb_test_os.bplus.bin"
+	$(_V)$(TASS) beeb_test_os.s65 --m65xx -Dmodel_b=true --nostart "--list=$(BUILD)/beeb_test_os.b.lst" "--output=$(BUILD)/beeb_test_os.b.bin"
+	$(_V)$(TASS) beeb_test_os.s65 --m65xx -Dmodel_bplus=true --nostart "--list=$(BUILD)/beeb_test_os.bplus.lst" "--output=$(BUILD)/beeb_test_os.bplus.bin"
+	$(_V)$(TASS) beeb_test_os.s65 --m65c02 -Dmodel_master=true --nostart "--list=$(BUILD)/beeb_test_os.master.lst" "--output=$(BUILD)/beeb_test_os.master.bin"
 
 ##########################################################################
 ##########################################################################
@@ -53,4 +54,5 @@ clean:
 tom_laptop: _CURL:=curl --no-progress-meter
 tom_laptop:
 	$(_V)$(MAKE) build
-	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B+128 (Test OS)"
+#	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B+128 (Test OS)"
+	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=Master 128 (Test OS)"
