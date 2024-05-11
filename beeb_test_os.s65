@@ -2,6 +2,15 @@
 
 ;-------------------------------------------------------------------------
 
+; Better to use $20 than $00, as if bits other than bit 5 are stuck
+; high then you won't get any control chars that could muck things up.
+;
+; If bit 5 is stuck low, best hope other bits aren't stuck high!
+EMPTY_CHAR=$20
+FILL_CHAR=$ff
+                
+;-------------------------------------------------------------------------
+
 *=$c000
                 .dsection code
                 .cerror *>$fffa,'code overflow'
@@ -96,6 +105,35 @@ show_crtc_address_in_LEDs: .macro
                 sta system_via.orb
                 .endmacro
 
+draw_msn_glyph: .macro addr
+                and #$f0        ; (n>>4)*16
+                lsr a           ; (n>>4)*8
+                .draw_glyph \addr
+                .endmacro
+
+draw_lsn_glyph: .macro addr
+                and #$0f
+                asl a
+                asl a
+                asl a
+                .draw_glyph \addr
+                .endmacro
+
+draw_glyph: .macro addr
+                tax
+                ldy #7
+loop:
+                .for _y=0,_y<8,_y+=1
+                lda glyphs_rows[_y],x
+                sta \addr+_y*40,y
+                .endfor
+                inx
+                dey
+                bpl loop
+                .endmacro
+
+mode_7_addr: .function _x,_y
+                .endfunction $7c00+_y*40+_x
                 
 ;-------------------------------------------------------------------------
 
@@ -216,7 +254,7 @@ main_menu_loop:
                 .handle_key key_4,set_mode_4
                 .handle_key key_7,set_mode_7
                 .handle_key key_e,teletext_engineering_test
-                
+                .handle_key key_x,memory_test.error
 
                 ; delay ~3,000 cycles
                 ldx #0
@@ -449,10 +487,11 @@ error:
                 ; A = got byte
                 ; patterns,x = wanted byte
 
-                sta system_via.t1l_l ; wanted byte
-                lda patterns,x
-                sta system_via.t1l_h ; got byte
+                eor patterns,x
+                sta system_via.t1l_l ; incorrect bits
 
+                sty system_via.t1l_h ; page offset
+                
                 .set_mode crtc_teletext,-1,$4a
 
                 ldx #8+6
@@ -461,6 +500,7 @@ error:
                 stx system_via.orb
 
                 ldx #0
+                lda #EMPTY_CHAR
 cls_loop:
                 sta $7c00,x
                 sta $7d00,x
@@ -469,70 +509,29 @@ cls_loop:
                 inx
                 bne cls_loop
 
-                .copy_message memory_test_messages.address_addr,memory_test_messages.address_message
-                tya
-                lda msn_digit,y
-                sta memory_test_messages.address_addr+2,x
-                tya
-                and #15
-                tay
-                lda lsn_digit,y
-                sta memory_test_messages.address_addr+3,x
-
-                txa
-                tay
+                ; Problem address
                 tsx
-                lda msn_digit,x
-                sta memory_test_messages.address_addr+0,y
                 txa
-                and #15
-                tax
-                lda lsn_digit,x
-                sta memory_test_messages.address_addr+1,y
+                .draw_msn_glyph mode_7_addr(0,0)
+                tsx
+                txa
+                .draw_msn_glyph mode_7_addr(8,0)
+                lda system_via.t1l_h
+                .draw_msn_glyph mode_7_addr(16,0)
+                lda system_via.t1l_h
+                .draw_lsn_glyph mode_7_addr(24,0)
 
-                .copy_message memory_test_messages.wanted_addr,memory_test_messages.wanted_message
-                ldy system_via.t1l_l
-                lda msn_digit,y
-                sta memory_test_messages.wanted_addr+0,x
-                tya
-                and #15
-                tay
-                lda lsn_digit,y
-                sta memory_test_messages.wanted_addr+1,x
+                ; Problem bits
+                lda system_via.t1l_l
+                .draw_msn_glyph mode_7_addr(0,8)
+                lda system_via.t1l_l
+                .draw_lsn_glyph mode_7_addr(8,8)
 
-                .copy_message memory_test_messages.got_addr,memory_test_messages.got_message
-                ldy system_via.t1l_h
-                lda msn_digit,y
-                sta memory_test_messages.got_addr+0,x
-                tya
-                and #15
-                tay
-                lda lsn_digit,y
-                sta memory_test_messages.got_addr+1,x
                 .cerror *!=hang ; must fall through
                 .endproc
                 
 hang:
                 jmp hang
-
-                
-
-;-------------------------------------------------------------------------
-
-memory_test_messages: .block
-                
-address_addr=$7c00+40
-address_message:
-                .shift "Address: &"
-
-wanted_addr=$7c00+2*40
-wanted_message:
-                .shift "Wanted:  &"
-
-got_addr=$7c00+3*40
-got_message:
-                .shift "Got:     &"
-                .endblock
 
 ;-------------------------------------------------------------------------
 
@@ -654,6 +653,10 @@ palette_mono:
 
 engtest:
                 .binary "engtest.dat"
+
+;-------------------------------------------------------------------------
+
+                .include "build/glyphs_data.generated.s65"
                 
 ;-------------------------------------------------------------------------
 

@@ -82,6 +82,8 @@ You can tap the following keys:
 
 - E :: engineering test
 
+- X :: main memory test failure example display
+
 ## Main memory test (doesn't use RAM)
 
 Lights both LEDs and constantly fills main RAM with a series of
@@ -90,30 +92,29 @@ see a bunch of patterns on screen as it runs. The test runs itself,
 and if there's an error, it will switch to Mode 7, switch the LEDs
 off, and print a report.
 
-This does not use RAM for the test. But RAM is used for displaying the
-report, so if things are completely hosed then the report may be
-unreadable or incorrect.
+The error report consists of two rows of large text. The first row
+shows the problem address (4 hex digits), and the second row is a mask
+indicating which bits were found to be incorrect (2 hex digits).
+
+This does not use RAM for the test, but RAM is necessarily used to
+display the report. The report is intended to be somewhat resistant to
+stuck bits or noise, but no guarantees.
 
 ## Main memory test with ignore bits (doesn't use RAM)
 
-As main memory test, but you can specify a mask value indicating which
-bits to ignore. For example, if bit 4 of memory appears to be bad, you
-can have the test ignore bit 4, to see if the fault is isolated or if
-any other bits are also affected.
-
-(The ordinary main memory test uses a mask of $00.)
+As main memory test, but you can use the mask printed by the main
+memory test to indicate which bits to ignore, to see if the memory
+test passes if those bits are ignored.
 
 When the test starts, both LEDs are off, indicating it's waiting for
-you to enter the mask for the bad bits. Enter it as two hex digits:
-more significant, then less significant. For example, if bit 4 is bad,
-tap `1` then `0`, for $10, aka %00010000.
-
-The caps lock LED will light up after the first digit is entered, then
-shift lock after the second (but hopefully you'll see the test run so
-it'll be obvious).
+you to enter the mask for the bad bits. Enter it as two hex digits, as
+shown by the main memory test. The caps lock LED will light up after
+the first digit is entered, then shift lock after the second (but
+hopefully you'll see the test run so it'll be obvious).
 
 If a failure report is printed, the values of the ignored bits are
-indeterminate, and you will have to ignore them yourself. Apologies!
+indeterminate, and you will have to manually figure out what the new
+mask for further tests should be. Apologies!
 
 ## Visual bits test (doesn't use RAM)
 
@@ -146,3 +147,8 @@ occurred. The wraparound size is always 20 KB.
 ## Engineering test
 
 Selects mode 7 and shows the Ceefax engineering test page.
+
+## Main memory test failure example display
+
+Shows an example of the memory test failure display. The address and
+mask shown are meaningless.
