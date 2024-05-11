@@ -8,11 +8,29 @@
 ; If bit 5 is stuck low, best hope other bits aren't stuck high!
 EMPTY_CHAR=$20
 FILL_CHAR=$ff
+
+;-------------------------------------------------------------------------
+
+                .weak
+model_b=false
+model_bplus=false
+                .endweak
+
+                .if !model_b&&!model_bplus
+                .error "must specify model type"
+                .endif
                 
 ;-------------------------------------------------------------------------
 
 *=$c000
-                .dsection code
+                ; For B+, memory test needs to go first, as the shadow
+                ; RAM loads/stores need to be in the MOS VDU driver
+                ; area at $c000-$dfff.
+                .dsection memory_test
+                .dsection user_interface
+                .dsection bits_test
+                .dsection data
+                .dsection dummy_entry_points
                 .cerror *>$fffa,'code overflow'
 *=$fffa
                 .dsection vectors
@@ -134,11 +152,30 @@ loop:
 
 mode_7_addr: .function _x,_y
                 .endfunction $7c00+_y*40+_x
+
+; Preserves X/Y/C
+activate_shadow: .macro
+                .if model_bplus
+                lda #$80
+                sta acccon
+                .else
+                .error
+                .endif
+                .endmacro
+
+; Preserves X/Y/C
+deactivate_shadow: .macro
+                .if model_bplus
+                lda #$00
+                sta acccon
+                .else
+                .error
+                .endif
+                .endmacro
                 
 ;-------------------------------------------------------------------------
 
-
-                .section code
+                .section user_interface
 reset_entry_point:
                 sei
                 lda #0
@@ -304,9 +341,11 @@ teletext_engineering_test:
 set_mode_7:
                 .set_mode crtc_teletext,-1,$4a
                 jmp main_menu_loop
+                .endsection
 
 ;-------------------------------------------------------------------------
 
+                .section bits_test
 bits_test: .proc
 
 fill_00:
@@ -376,15 +415,58 @@ toggle_address:
                 .show_crtc_address_in_LEDs
                 jmp test_loop
                .endproc
+               .endsection
                 
 ;-------------------------------------------------------------------------
 
+; Page numbers:
+
+; Range       B         B+          Master
+; -----       -         --          ------
+; $00 - $7F   Main RAM
+; $80 - $90   -         ANDY        ANDY
+; $A0 - $AF   -         ANDY        HAZEL
+; $B0 - $FF   -         Shadow RAM  Shadow RAM
+                
+test_page_address: .function page
+                .if page>=0&&page<$80
+                ; main RAM
+_addr=page*256
+                .elsif model_bplus&&page>=$80&&page<$b0
+_addr=page*256
+                .elsif model_bplus&&page>=$b0&&page<$100
+                ; access to this region is only possible from
+                ; instructions fetched from a particular address
+                ; range.
+                .cerror !(*>=$c000&&*<$e000)
+_addr=(page-($b0-$30))*256
+                .else
+                .cerror format("invalid page number: $%02x (%d)",page,page)
+                .endif
+                .endfunction _addr
+                
+test_fill_iteration: .segment page
+                sta test_page_address(\page),y
+                .endsegment
+
+                .section memory_test
+test_check_iteration: .segment page
+                lda test_page_address(\page),y ; fetch memory byte
+                eor patterns,x                 ; get differences from pattern
+                and system_via.t1l_h           ; mask out ignore bits
+                beq +
+                
+                ldx #\page
+                jmp error
++
+                .endsegment
+                
 memory_test: .proc
                 ; the T1 latch can act as a handy 16 bits of (slightly
                 ; slow) RAM. IRQs are disabled so it doesn't matter if
                 ; the timer times out more often.
-                lda #0
-                sta system_via.t1l_h
+                lda #$ff
+                sta system_via.t1l_h ; keep bits
                 
                 ldx #key_shift
                 stx system_via.ora_no_handshake
@@ -433,6 +515,7 @@ wait_for_lsn_key_up:
                 bmi wait_for_lsn_key_up
                 txa
                 ora system_via.t1l_h
+                eor #$ff        ; convert ignore bits to keep bits
                 sta system_via.t1l_h
                 jmp test
 next_lsn_key:
@@ -445,8 +528,7 @@ test:
                 ; system VIA ACR is available for use.
 
                 ldx #0          ; per-byte increment
-                sta system_via.acr
-
+                stx system_via.acr
 
                 ; 
                 
@@ -454,6 +536,12 @@ test:
                 stx system_via.orb
                 ldx #0+7        ; shift lock on
                 stx system_via.orb
+
+                .if model_bplus
+                ; enable ANDY
+                lda #$80
+                sta romsel
+                .endif
 
 test_loop:
                 
@@ -463,10 +551,28 @@ test_loop:
                 ldy #0          ; Y = page offset
 fill_loop:
                 lda patterns,x
-                
-                .for _i=0,_i<128,_i+=1
-                sta _i*256,y
+
+                ; fill main RAM                
+                .for _i=0,_i<$80,_i+=1
+                .test_fill_iteration _i
                 .endfor
+
+                .if model_bplus
+
+                ; fill ANDY
+                .for _i=$80,_i<$b0,_i+=1
+                .test_fill_iteration _i
+                .endfor
+
+                ; fill shadow
+                .activate_shadow
+                lda patterns,x
+                .for _i=$c0,_i<$100,_i+=1
+                .test_fill_iteration _i
+                .endfor
+                .deactivate_shadow
+
+                .endif
 
                 clc
                 txa
@@ -479,22 +585,25 @@ fill_loop:
 
                 tsx
 check_loop:
-                .for _i=0,_i<128,_i+=1
-                lda patterns,x  ; fetch pattern byte
-                and system_via.t1l_h ; keep ignore bits
-                sta system_via.t1l_l ; temp...
-                lda system_via.t1l_h ; fetch mask byte
-                eor #$ff             ; 0=ignore
-                and _i*256,y         ; get the non-ignore bits
-                ora system_via.t1l_l ; apply pattern bytes
-                eor patterns,x       ; acquire difference
-                beq +
-                
-                ldx #_i
-                txs             ; S = page
-                jmp error
-+
+                .for _i=0,_i<$80,_i+=1
+                .test_check_iteration _i
                 .endfor
+
+                .if model_bplus
+
+                ; check ANDY
+                .for _i=$80,_i<$b0,_i+=1
+                .test_check_iteration _i
+                .endfor
+
+                ; check shadow
+                .activate_shadow
+                .for _i=$c0,_i<$100,_i+=1
+                .test_check_iteration _i
+                .endfor
+                .deactivate_shadow
+
+                .endif
 
                 clc
                 txa
@@ -515,12 +624,17 @@ check_loop:
                 jmp test_loop
 
 error:
-                ; S = page
+                ; X = page
                 ; Y = page offset
                 ; A = incorrect bits
 
+                txs                  ; save page
                 sta system_via.t1l_l ; incorrect bits
                 sty system_via.t1l_h ; page offset
+
+                .if model_bplus
+                .deactivate_shadow
+                .endif
                 
                 .set_mode crtc_teletext,-1,$4a
 
@@ -563,8 +677,11 @@ cls_loop:
 hang:
                 jmp hang
 
+                .endsection
+
 ;-------------------------------------------------------------------------
 
+                .section data
 msn_digit:
                 .for _i=0,_i<256,_i+=1
                 .byte format("%X",_i>>4)
@@ -701,9 +818,12 @@ engtest:
 ;-------------------------------------------------------------------------
 
                 .include "build/glyphs_data.generated.s65"
+
+                .endsection
                 
 ;-------------------------------------------------------------------------
 
+                .section dummy_entry_points
 nmi_entry_point:
                 rti
 

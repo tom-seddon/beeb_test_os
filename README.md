@@ -1,6 +1,4 @@
-Test OS for diagnosing basic problems with BBC B/B+. Tests the 32 KB
-of main RAM that the OS needs to boot. Also exercises the system VIA
-to a limited extent.
+Test OS for diagnosing basic problems with BBC B/B+. 
 
 # Build
 
@@ -37,7 +35,10 @@ Type `make` from the root of the working copy.
 
 The build process is supposed to be silent when there are no errors.
 
-The output is a 16 KB ROM: `build/beeb_test_os.bin`
+The output is two 16 KB ROMs:
+
+* `build/beeb_test_os.b.bin` - BBC B/B+ version
+* `build/beeb_test_os.bplus.bin` - BBC B+ version
 
 # Installation
 
@@ -63,7 +64,7 @@ On startup, the test OS does 5 writes of $00 to address $0000, does
 some minimal system initialisation (including attempting to silence
 the sound), then does 10 writes of $00 to address $0000. (If following
 along, watch CPU A15 and CPU A8 - all other writes on startup should
-be to the I/O region.)
+be to the I/O region and the stack.)
 
 If this is a power-on reset, it selects mode 7.
 
@@ -72,7 +73,9 @@ lock and shift lock LEDs.
 
 You can tap the following keys:
 
-- 0, 4, 7 :: select display mode
+- 0, 4, 7 :: select display mode and wait for another option
+
+- E :: show Ceefax engineering test page and wait for another option
 
 - M :: main memory test
 
@@ -80,25 +83,37 @@ You can tap the following keys:
 
 - B :: visual bits test
 
-- E :: engineering test
-
 - X :: main memory test failure example display
 
 ## Main memory test (doesn't use RAM)
 
-Lights both LEDs and constantly fills main RAM with a series of
+Lights both LEDs and constantly fills memory with a series of
 patterns, checking the values didn't change when read back. You should
 see a bunch of patterns on screen as it runs. The test runs itself,
 and if there's an error, it will switch to Mode 7, switch the LEDs
 off, and print a report.
 
 The error report consists of two rows of large text. The first row
-shows the problem address (4 hex digits), and the second row is a mask
-indicating which bits were found to be incorrect (2 hex digits).
+shows the problem address (4 hex digits - see below), and the second
+row is a mask indicating which bits were found to be incorrect (2 hex
+digits).
 
 This does not use RAM for the test, but RAM is necessarily used to
 display the report. The report is intended to be somewhat resistant to
 stuck bits or noise, but no guarantees.
+
+### Memory test addresses
+
+Addresses shown on BBC B will be 0000-7fff, indicating the problem
+address in main RAM.
+
+For B+, there are 3 separate regions:
+
+| Addresses | Region |
+| --- | --- |
+| 0000-7fff | 32 KB main RAM |
+| 8000-afff | 12 KB extra B+ RAM |
+| b000-ffff | 20 KB shadow RAM |
 
 ## Main memory test with ignore bits (doesn't use RAM)
 
@@ -113,13 +128,14 @@ the first digit is entered, then shift lock after the second (but
 hopefully you'll see the test run so it'll be obvious).
 
 If a failure report is printed, the values of the ignored bits are
-indeterminate, and you will have to manually figure out what the new
-mask for further tests should be. Apologies!
+treated as matching, and you will have to manually figure out what the
+combined mask for further tests should be. Apologies!
 
 ## Visual bits test (doesn't use RAM)
 
 Writes a configurable value - initially zero - to all 32 KB of main
-RAM, so you can see the effect on screen.
+RAM, so you can see the effect on screen. (This only affects main RAM.
+B+ Shadow RAM is not filled.)
 
 Tap F to refill memory with the existing value.
 
@@ -144,11 +160,11 @@ If the screen wraps round (e.g., displaying Mode 0 starting at $4000),
 the flashing cursor indicates where the wraparound back to $3000
 occurred. The wraparound size is always 20 KB.
 
-## Engineering test
+## Ceefax engineering test page
 
 Selects mode 7 and shows the Ceefax engineering test page.
 
 ## Main memory test failure example display
 
-Shows an example of the memory test failure display. The address and
-mask shown are meaningless.
+Shows an example of the memory test failure display, so you can double
+check it'll be readable. The address and mask shown are meaningless.

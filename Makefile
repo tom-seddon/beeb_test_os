@@ -29,7 +29,8 @@ BUILD:=$(abspath ./build)
 .PHONY:build
 build: _folders
 	$(_V)$(PYTHON) glyphs_data.py > "$(BUILD)/glyphs_data.generated.s65"
-	$(_V)$(TASS) beeb_test_os.s65 --nostart "--list=$(BUILD)/beeb_test_os.lst" "--output=$(BUILD)/beeb_test_os.bin"
+	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_b=true --nostart "--list=$(BUILD)/beeb_test_os.b.lst" "--output=$(BUILD)/beeb_test_os.b.bin"
+	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_bplus=true --nostart "--list=$(BUILD)/beeb_test_os.bplus.lst" "--output=$(BUILD)/beeb_test_os.bplus.bin"
 
 ##########################################################################
 ##########################################################################
