@@ -567,21 +567,36 @@ xdigit_keys:
 
 ;-------------------------------------------------------------------------
 
+patterns_reset: .segment reset
+                .if \reset!=0
+                .byte $00
+                .byte $ff
+                .endif
+                .endsegment
+
 patterns: .block
+                .for _reset:=0,_reset<2,_reset+=1
                 .byte $00
                 .for _i=0,_i<8,_i+=1
                 .byte (1<<_i)
-                .byte $00
-                .byte $ff
+                .patterns_reset _reset
                 .endfor
                 .byte $aa
-                .byte $00
+                .patterns_reset _reset
                 .byte $55
-                .byte $00
+                .patterns_reset _reset
                 .for _i:=0,_i<8,_i+=1
                 .byte (~(1<<_i))&$ff
-                .byte $00
-                .byte $ff
+                .patterns_reset _reset
+                .endfor
+                .for _i:=0,_i<8,_i+=1
+                .byte ($ff<<_i)&$ff
+                .patterns_reset _reset
+                .endfor
+                .for _i:=0,_i<8,_i+=1
+                .byte $ff>>_i
+                .patterns_reset _reset
+                .endfor
                 .endfor
                 .endblock
 
