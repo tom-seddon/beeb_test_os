@@ -191,3 +191,7 @@ Selects mode 7 and shows the Ceefax engineering test page.
 
 Shows an example of the memory test failure display, so you can double
 check it'll be readable. The address and mask shown are meaningless.
+
+# Licence
+
+GPL v3. See [./gpl-3.0.txt](./gpl-3.0.txt).
