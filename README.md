@@ -1,58 +1,63 @@
 Test OS for diagnosing basic problems with BBC B/B+/Master.
 
-# Build
-
-## Prerequisites
-
-* Python 3.x
-
-On Unix:
-
-* [`64tass`](http://tass64.sourceforge.net/) (I use r3120)
-* GNU Make
-
-(Prebuilt Windows EXEs for 64tass and make are included in the repo.)
-
-## git clone
-
-This repo has submodules. Clone it with `--recursive`:
-
-    git clone --recursive https://github.com/tom-seddon/beeb_test_os
-	
-Alternatively, if you already cloned it non-recursively, you can do
-the following from inside the working copy:
-
-    git submodule init
-	git submodule update
-
-(The code won't build without fiddling around if you download one of
-the archive files from GitHub - a GitHub limitation. It's easiest to
-clone it as above.)
-
-## Build steps
-
-Type `make` from the root of the working copy.
-
-The build process is supposed to be silent when there are no errors.
-
-The output is six 16 KB ROMs. There are 3 standard versions
-
-* `build/beeb_test_os.b.bin` - BBC B/B+/B+128 version (tests 32 KB main RAM)
-* `build/beeb_test_os.bplus.bin` - BBC B+ version (tests 64 KB RAM)
-* `build/beeb_test_os.master.bin` - BBC Master version (tests 128 KB RAM)
-
-There are 3 additional BBC Master versions, that test some subset of
-the onboard sideways RAM banks. You might want to use these if you
-have paged ROMs installed that are blocking access to the sideways
-RAM.
-
-* `build/beeb_test_os.master.sw45.bin` - tests banks 4 and 5 only
-* `build/beeb_test_os.master.sw67.bin` - tests banks 6 and 7 only
-* `build/beeb_test_os.master.swno.bin` - does not test sideways RAM
-
 # Installation
 
-Write to EPROM (or similar) and insert in OS ROM socket.
+Download ZIP file for latest release: https://github.com/tom-seddon/beeb_test_os/releases/latest
+
+Unzip somewhere.
+
+The ZIP file contains multiple ROM images, organized in folders named
+after the ROM size in KB. Pick the right one according to system of
+interest and size of PROM you have to hand (see list below).
+
+Program ROM and insert in specified socket.
+
+## BBC B
+
+Tests 32 KB RAM.
+
+- `16/beeb_test_os.b.bin`
+- `32/beeb_test_os.b.bin`
+- `64/beeb_test_os.b.bin`
+
+Insert ROM in socket IC51.
+
+## BBC B+/BBC B+128
+
+Tests 64 KB RAM (32 KB main RAM, 20 KB shadow RAM, 12 KB extra RAM).
+
+The B+128 extra sideways RAM is not tested. Apologies!
+
+- `16/beeb_test_os.bplus.bin`
+- `32/beeb_test_os.bplus.bin`
+- `64/beeb_test_os.bplus.bin`
+
+Insert ROM in socket IC71.
+
+## Master Compact/Olivetti PC 128 S
+
+Tests 128 KB RAM (32 KB main RAM, 20 KB shadow RAM, 4 KB ANDY, 8 KB
+HAZEL, 64 KB sideways RAM).
+
+- `64/beeb_test_os.master.bin`
+
+Insert ROM in socket IC49.
+
+## Master 128
+
+All ROMs test 64 KB RAM (32 KB main RAM, 20 KB shadow RAM, 4 KB ANDY,
+8 KB HAZEL), plus some amount of sideways RAM. Pick the appropriate
+version according to ROMs installed in IC37/IC41.
+
+- `128/beeb_test_os.master.bin` - tests 64 KB sideways RAM
+- `128/beeb_test_os.master.sw45.bin` - tests 32 KB sideways RAM, banks 4+5
+- `128/beeb_test_os.master.sw67.bin` - tests 32 KB sideways RAM, banks 6+7
+- `128/beeb_test_os.master.swno.bin` - does not test sideways RAM
+
+The MOS ROM socket is IC24. 28-pin 1 Mbit PROMs don't exist; you'll
+need an 32-pin PROM with an adapter (e.g.,
+https://mdfs.net/Info/Comp/BBC/SROMs/MegaROM.htm), or one of the
+commonly available switchable flash ROM MOS devices.
 
 # Use
 
@@ -191,6 +196,47 @@ Selects mode 7 and shows the Ceefax engineering test page.
 
 Shows an example of the memory test failure display, so you can double
 check it'll be readable. The address and mask shown are meaningless.
+
+# Build
+
+The source is supplied and you can build it yourself on Windows,
+macOS, Linux, and hopefully any other Unix type of system.
+
+## Prerequisites
+
+* Python 3.x
+
+On Unix:
+
+* [`64tass`](http://tass64.sourceforge.net/) (I use r3120)
+* GNU Make
+
+(Prebuilt Windows EXEs for 64tass and make are included in the repo.)
+
+## git clone
+
+This repo has submodules. Clone it with `--recursive`:
+
+    git clone --recursive https://github.com/tom-seddon/beeb_test_os
+	
+Alternatively, if you already cloned it non-recursively, you can do
+the following from inside the working copy:
+
+    git submodule init
+	git submodule update
+
+(The code won't build without fiddling around if you download one of
+the archive files from GitHub - a GitHub limitation. It's easiest to
+clone it as above.)
+
+## Build steps
+
+Type `make` from the root of the working copy.
+
+The build process is supposed to be silent when there are no errors.
+
+The output is a ROM images, as described above, in folders inside
+`build`: `build/16` (16 KB ROMs), `build/32` (32 KB ROMs), and so on.
 
 # Licence
 
