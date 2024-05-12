@@ -29,6 +29,7 @@ BUILD:=$(abspath ./build)
 .PHONY:build
 build: _folders
 	$(_V)$(PYTHON) glyphs_data.py > "$(BUILD)/glyphs_data.generated.s65"
+
 	$(_V)$(MAKE) _build_b MODEL=b
 	$(_V)$(MAKE) _build_b MODEL=bplus
 	$(_V)$(MAKE) _build_master FIRST=4 NUM=4 SUFFIX=
@@ -70,6 +71,8 @@ clean:
 ##########################################################################
 ##########################################################################
 
+# The tom_ targets run on my laptop.
+
 .PHONY:tom_laptop
 tom_laptop: _CURL:=curl --no-progress-meter
 tom_laptop:
@@ -86,3 +89,13 @@ tom_megarom:
 	$(_V)$(MAKE) build
 	$(_V)$(SHELLCMD) split -b 131072 "../mos320/orig/multios/multios.bin" "$(BUILD)/multios"
 	$(_V)$(SHELLCMD) concat -o "$(BUILD)/multios.bin" "$(BUILD)/multios0" "$(BUILD)/128/beeb_test_os.master.bin" "$(BUILD)/multios2" "$(BUILD)/multios3" 
+
+##########################################################################
+##########################################################################
+
+# The ci_ targets run on the CI server, so Linux only.
+
+.PHONY:ci_build_64tass
+ci_build_64tass:
+	svn checkout -r 3120 https://svn.code.sf.net/p/tass64/code/trunk "$(HOME)/tass64-code"
+	cd "$(HOME)/tass64-code" && make -j$(nproc)
