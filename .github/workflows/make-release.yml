@@ -12,4 +12,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: make ci_build_64tass
-        
+      - run: make VERBOSE=1 "TASSCMD=$(HOME)/tass64-code/64tass"
