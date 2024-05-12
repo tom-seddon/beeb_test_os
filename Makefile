@@ -106,3 +106,14 @@ tom_megarom:
 ci_build_64tass:
 	svn checkout -r 3120 https://svn.code.sf.net/p/tass64/code/trunk "$(HOME)/tass64-code"
 	cd "$(HOME)/tass64-code" && make -j$(nproc)
+
+.PHONY:ci_make_release
+ci_make_release: _COMMIT:=$(shell git log -1 '--format=%H')
+ci_make_release: _NAME:=$(shell git log -1 '--format=%cd-%h' '--date=format:%Y%m%d-%H%M%S')
+ci_make_release: _ZIP:=beeb_test_os.$(_NAME).zip
+ci_make_release: _README_URL:=https://github.com/tom-seddon/beeb_test_os/blob/$(_COMMIT)/README.md
+ci_make_release:
+	cd "$(BUILD)" && echo "See $(_README_URL)" > README.txt
+	cd "$(BUILD)" && zip -9r "$(_ZIP)" 16 32 64 128 README.txt
+	gh release create "$(_NAME)" --notes "$(_README_URL)"
+	gh release upload "$(_NAME)" "$(BUILD)/$(_ZIP)"
