@@ -20,7 +20,14 @@ _TASSQ:=-q
 endif
 
 TASS:="$(TASSCMD)" -C -Wall --line-numbers $(_TASSQ) --verbose-list --long-branch --nostart
-SHELLCMD:=$(PYTHON) $(realpath submodules/shellcmd.py/shellcmd.py)
+
+SHELLCMD_PY_RELPATH:=submodules/shellcmd.py/sahellcmd.py
+SHELLCMD_PY_REALPATH:=$(realpath $(SHELLCMD_PY_RELPATH))
+ifeq ($(strip $(SHELLCMD_PY_REALPATH)),)
+$(error $(SHELLCMD_PY_RELPATH) not found. Are submodules missing?)
+endif
+
+SHELLCMD:=$(PYTHON) "$(SHELLCMD_PY_REALPATH)"
 BUILD:=$(abspath ./build)
 
 ##########################################################################
