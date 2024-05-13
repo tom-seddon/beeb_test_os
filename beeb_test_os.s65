@@ -652,6 +652,16 @@ rom_fill_loop:
                 iny
                 bne fill_loop
 
+                ; Delay ~165 ms - give memory time to decay, if
+                ; refresh isn't working properly.
+                ldy #0
+                ldx #0
+decay_loop:
+                inx
+                bne decay_loop
+                iny
+                bne decay_loop
+
                 tsx
 check_loop:
                 .if model_bplus||model_master
