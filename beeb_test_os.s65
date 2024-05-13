@@ -3,15 +3,6 @@
 
 ;-------------------------------------------------------------------------
 
-; Better to use $20 than $00, as if bits other than bit 5 are stuck
-; high then you won't get any control chars that could muck things up.
-;
-; If bit 5 is stuck low, best hope other bits aren't stuck high!
-EMPTY_CHAR=$20
-FILL_CHAR=$ff
-
-;-------------------------------------------------------------------------
-
                 .weak
 model_b=false
 model_bplus=false
@@ -40,12 +31,14 @@ master_test_sideways_ram=master_num_sideways_ram_banks>0
                 .dsection bits_test
                 .dsection data
                 .dsection memory_test_patterns
+                .dsection memory_test_error
 
                 .elif model_master
 
                 .dsection user_interface
                 .dsection bits_test
                 .dsection data
+                .dsection memory_test_error
 
                 ; For Master, memory test wants to go last, as it has
                 ; to be out of the way of HAZEL.
@@ -59,7 +52,7 @@ master_test_sideways_ram=master_num_sideways_ram_banks>0
                 
                 .dsection entry_points
                 
-                .cerror *>$fffa,'code overflow'
+                .cerror *>$fc00,format('code overflow: *=$%04x',*)
 *=$fffa
                 .dsection vectors
 
@@ -151,35 +144,103 @@ show_crtc_address_in_LEDs: .macro
                 sta system_via.orb
                 .endmacro
 
-draw_msn_glyph: .macro addr
+draw_msn_glyph: .macro mode,xc,yc
                 and #$f0        ; (n>>4)*16
                 lsr a           ; (n>>4)*8
-                .draw_glyph \addr
+                .draw_glyph \mode,\xc,\yc
                 .endmacro
 
-draw_lsn_glyph: .macro addr
+draw_lsn_glyph: .macro mode,xc,yc
                 and #$0f
                 asl a
                 asl a
                 asl a
-                .draw_glyph \addr
+                .draw_glyph \mode,\xc,\yc
                 .endmacro
 
-draw_glyph: .macro addr
+draw_glyph: .macro mode,xc,yc
                 tax
+
+                .if \mode==7
+
                 ldy #7
 loop:
                 .for _y=0,_y<8,_y+=1
                 lda glyphs_rows[_y],x
-                sta \addr+_y*40,y
+                bne +
+
+                ; Better to use $20 than $00, as if bits other than
+                ; bit 5 are stuck ; high then you won't get any
+                ; control chars that could muck things up. (If bit 5
+                ; is stuck low, best hope other bits aren't stuck
+                ; high! Or try a bitmap mode...)
+                lda #$20
++
+                sta $7c00+((\yc)*8+_y)*40+(\xc)*8,y
                 .endfor
                 inx
                 dey
                 bpl loop
+
+                .elif \mode==4
+
+                ldy #63
+loop:
+loop2:
+                .for _y=0,_y<8,_y+=1
+                lda glyphs_rows[_y],x
+                sta $5800+((\yc)*8+_y)*320+(\xc)*64,y
+                .endfor
+                dey
+                tya
+                and #7
+                cmp #7
+                bne loop2
+                inx
+                cpy #$ff
+                bne loop
+                
+                .else
+                .error
+                .endif
+                
                 .endmacro
 
-mode_7_addr: .function _x,_y
-                .endfunction $7c00+_y*40+_x
+error_screen: .macro mode
+                
+                ; Problem address
+addr_x:=0
+                .if model_master
+                lda romsel
+                and #$0f
+                .draw_lsn_glyph \mode,addr_x,0
+addr_x:=addr_x+1
+                .endif
+                tsx
+                txa
+                .draw_msn_glyph \mode,addr_x,0
+addr_x:=addr_x+1
+                tsx
+                txa
+                .draw_lsn_glyph \mode,addr_x,0
+addr_x:=addr_x+1
+                lda system_via.t1l_h
+                .draw_msn_glyph \mode,addr_x,0
+addr_x:=addr_x+1
+                lda system_via.t1l_h
+                .draw_lsn_glyph \mode,addr_x,0
+addr_x:=addr_x+1
+
+                ; Problem bits
+                lda system_via.t1l_l
+                .draw_msn_glyph \mode,0,1
+                lda system_via.t1l_l
+                .draw_lsn_glyph \mode,1,1
+
+                jmp hang
+                
+                .endmacro
+                
 
 ; Preserves X/Y/C
 activate_shadow: .macro
@@ -320,7 +381,7 @@ main_menu_loop:
                 .handle_key key_4,set_mode_4
                 .handle_key key_7,set_mode_7
                 .handle_key key_e,teletext_engineering_test
-                .handle_key key_x,memory_test.error
+                .handle_key key_x,error
 
                 ; delay ~3,000 cycles
                 ldx #0
@@ -725,68 +786,59 @@ rom_check_loop:
                 
                 jmp test_loop
 
-error:
-                ; X = page
-                ; Y = page offset
-                ; A = incorrect bits
+                .endproc
 
-                txs                  ; save page
-                sta system_via.t1l_l ; incorrect bits
-                sty system_via.t1l_h ; page offset
+                .endsection
 
-                .if model_bplus||model_master
-                .deactivate_shadow
-                .endif
+;-------------------------------------------------------------------------
 
-                .if model_master
-                lda #acccon.y
-                trb acccon
-                .endif
-                
-                .set_mode crtc_teletext,-1,$4a
-
+                .section memory_test_error
+error_2: .proc
                 ldx #8+6
                 stx system_via.orb
                 ldx #8+7
                 stx system_via.orb
 
+                lda #12
+                sta $fe00
+                lda $fe01
+                and #$20
+                bne mode_7_error_screen
+
+mode_4_error_screen:
+                .set_mode crtc_10KB,palette_mono,$88
+
+                lda #12
+                sta $fe00
+                lda #$58>>3
+                sta $fe01
+
                 ldx #0
-                lda #EMPTY_CHAR
-cls_loop:
+                lda #0
+cls_mode_4_loop:
+                .for _i=$58,_i<$80,_i+=1
+                sta _i*256,x
+                .endfor
+                inx
+                bne cls_mode_4_loop
+
+                .error_screen 4
+                jmp hang
+
+mode_7_error_screen:
+                .set_mode crtc_teletext,-1,$4a
+
+                ldx #0
+                lda #32
+cls_mode_7_loop:
                 sta $7c00,x
                 sta $7d00,x
                 sta $7e00,x
                 sta $7f00,x
                 inx
-                bne cls_loop
+                bne cls_mode_7_loop
 
-                ; Problem address
-                .if model_master
-                lda romsel
-                and #$0f
-                .draw_lsn_glyph mode_7_addr(0,0)
-addr_x=8
-                .else
-addr_x=0
-                .endif
-                tsx
-                txa
-                .draw_msn_glyph mode_7_addr(addr_x+0,0)
-                tsx
-                txa
-                .draw_lsn_glyph mode_7_addr(addr_x+8,0)
-                lda system_via.t1l_h
-                .draw_msn_glyph mode_7_addr(addr_x+16,0)
-                lda system_via.t1l_h
-                .draw_lsn_glyph mode_7_addr(addr_x+24,0)
-
-                ; Problem bits
-                lda system_via.t1l_l
-                .draw_msn_glyph mode_7_addr(0,8)
-                lda system_via.t1l_l
-                .draw_lsn_glyph mode_7_addr(8,8)
-
-                .cerror *!=hang ; must fall through
+                .error_screen 7
                 .endproc
                 
 hang:
@@ -942,6 +994,28 @@ engtest:
 
                 .section entry_points
 
+error:
+                ; X = page
+                ; Y = page offset
+                ; A = incorrect bits
+
+                txs                  ; save page
+                sta system_via.t1l_l ; incorrect bits
+                sty system_via.t1l_h ; page offset
+
+                .if model_bplus||model_master
+                .deactivate_shadow
+                .endif
+
+                .if model_master
+                lda #acccon.y
+                trb acccon
+                .endif
+
+                jmp error_2
+
+;-------------------------------------------------------------------------
+
 reset_entry_point:
                 sei
                 cld
@@ -968,6 +1042,7 @@ nmi_entry_point:
 
 irq_entry_point:
                 rti
+
                 .endsection
 
 ;-------------------------------------------------------------------------

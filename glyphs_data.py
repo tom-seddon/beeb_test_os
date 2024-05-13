@@ -175,7 +175,7 @@ def main():
         labels.append(label)
         for glyph in range(num_glyphs):
             for x in range(8):
-                value='FILL_CHAR' if (glyph_data[glyph*8+row]&1<<x)!=0 else 'EMPTY_CHAR'
+                value='$ff' if (glyph_data[glyph*8+row]&1<<x)!=0 else '0'
                 print('    .byte %s'%value)
 
     print('glyphs_rows=[%s]'%','.join(labels))

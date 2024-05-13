@@ -105,17 +105,18 @@ You can tap the following keys:
 Lights both LEDs and constantly fills memory with a series of
 patterns, checking the values didn't change when read back. You should
 see a bunch of patterns on screen as it runs. The test runs itself,
-and if there's an error, it will switch to Mode 7, switch the LEDs
-off, and print a report.
+and if there's an error it will switch the LEDs off and display a
+report. The report uses mode 4 (if testing in modes 0 or 4), or mode 7
+(if testing in mode 7).
 
 The error report consists of two rows of large text. The first row
 shows the problem address (4 or 5 hex digits - see below), and the
 second row is a mask indicating which bits were found to be incorrect
 (2 hex digits).
 
-This does not use RAM for the test, but RAM is necessarily used to
-display the report. The report is intended to be somewhat resistant to
-stuck bits or noise, but no guarantees.
+The main memory test does not use RAM for the test, but RAM is
+necessarily used to display the report. The report is intended to be
+somewhat resistant to stuck bits or noise, but no guarantees.
 
 ### Memory test addresses
 
