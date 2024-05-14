@@ -30,32 +30,82 @@ master_test_sideways_ram=master_num_sideways_ram_banks>0
                 .dsection user_interface
                 .dsection bits_test
                 .dsection data
-                .dsection memory_test_patterns
+                ;.dsection memory_test_patterns
                 .dsection memory_test_error
 
                 .elif model_master
 
                 .dsection user_interface
-                .dsection bits_test
                 .dsection data
                 .dsection memory_test_error
 
                 ; For Master, memory test wants to go last, as it has
                 ; to be out of the way of HAZEL.
-                .if *<$e000
-*=$e000
+                .if *<$e000-(memory_test.page_in_hazel-memory_test)
+*=$e000-(memory_test.page_in_hazel-memory_test)
                 .endif
                 .dsection memory_test
-                .dsection memory_test_patterns
+                .dsection bits_test
                 
                 .endif
                 
-                .dsection entry_points
                 
                 .cerror *>$fc00,format('code overflow: *=$%04x',*)
+*=$fc00
+                .fill 768,0     ; stop I/O region appearing as a gap
+                                ; in the assembler output
+
+*=$ff00
+                
+                .dsection entry_points
+                .dsection memory_test_patterns
+                
 *=$fffa
                 .dsection vectors
 
+;-------------------------------------------------------------------------
+
+; Page numbers:
+
+; Range         B         B+          Master
+; -----         -         --          ------
+;  $00 -  $7F   Main RAM
+;  $80 -  $90   -         ANDY        ANDY
+;  $A0 -  $AF   -         ANDY        HAZEL
+;  $B0 -  $FF   -         Shadow RAM  Shadow RAM
+; $180 - $1BF   -         -           Sideways RAM
+;
+; The sideways RAM bank being tested is not part of the page number.
+; It's read from ROMSEL (hence lack of equivalent B+128
+; functionality).
+                
+test_page_address: .function page
+                .if page>=0&&page<$80
+                ; main RAM
+_addr=page*256
+                .elsif model_bplus&&page>=$80&&page<$b0
+_addr=page*256
+                .elsif (model_bplus||model_master)&&page>=$b0&&page<$100
+                .if model_bplus
+                ; access to this region is only possible from
+                ; instructions fetched from a particular address
+                ; range.
+                .cerror !(*>=$c000&&*<$e000)
+                .endif
+_addr=(page-($b0-$30))*256
+                .elsif model_master&&page>=$80&&page<$90
+_addr=page*256
+                .elsif model_master&&page>=$90&&page<$b0
+                ; code accessing this region should be placed elsewhere!
+                .cerror *>=$c000&&*<$e000
+_addr=$c000+(page-$90)*256
+                .elsif model_master&&page>=$180&&page<$1c0
+_addr=(page&$ff)*256
+                .else
+                .error format("invalid page number: $%02x (%d)",page,page)
+                .endif
+                .endfunction _addr
+                
 ;-------------------------------------------------------------------------
 
 ; Preserves Y/C
@@ -81,6 +131,8 @@ set_mode: .macro table,palette,ula
                 .endif
                 .endmacro
 
+;-------------------------------------------------------------------------
+
 ; Preserves Y/C
 copy_message: .macro addr,text
                 ldx #0
@@ -90,6 +142,8 @@ copy_message: .macro addr,text
                 sta \addr-1,x
                 bpl -
                 .endmacro
+
+;-------------------------------------------------------------------------
 
 ; Preserves A/Y/C
 handle_key: .macro key,routine
@@ -104,45 +158,7 @@ wait_for_up_loop:
 not_pressed:
                 .endmacro
 
-; Preserves A/Y
-cycle_crtc_address: .macro
-                tax
-                lda #12
-                sta $fe00
-                lda $fe01
-                cmp #$20
-                bcs cycle_done  ; taken if mode 7 - don't adjust
-                clc
-                adc #$20>>3     ; +8 KB
-                cmp #$10        ; past end of RAM?
-                bcc got_addr    ; taken if ok
-                lda #$00        ; reset address
-got_addr:
-                sta $fe01       ; update address
-cycle_done:
-                txa
-                .endmacro
-
-; Preserves A/Y
-show_crtc_address_in_LEDs: .macro
-                tax
-                lda #12
-                sta $fe00
-                lda $fe01
-                and #%00001100  ; extract 8 KB region index
-                
-                ; Reflect address in LEDs. Only bits 0-3 of ORB are
-                ; outputs so bits 4-7 in the value written can be
-                ; anything.
-                asl a           ; %000xy000
-                eor #%00011000  ; since 1=LED off, 0=LED on
-                ora #7          ; do shift lock LED
-                sta system_via.orb
-                lsr a
-                and #8          ; mask off just LED state
-                ora #6          ; do caps lock LED
-                sta system_via.orb
-                .endmacro
+;-------------------------------------------------------------------------
 
 draw_msn_glyph: .macro mode,xc,yc
                 and #$f0        ; (n>>4)*16
@@ -206,6 +222,8 @@ loop2:
                 
                 .endmacro
 
+;-------------------------------------------------------------------------
+
 error_screen: .macro mode
                 
                 ; Problem address
@@ -241,6 +259,7 @@ addr_x:=addr_x+1
                 
                 .endmacro
                 
+;-------------------------------------------------------------------------
 
 ; Preserves X/Y/C
 activate_shadow: .macro
@@ -408,12 +427,10 @@ delay_loop:
 
 set_mode_0:
                 .set_mode crtc_20KB,palette_mono,$9c
-                .show_crtc_address_in_LEDs
                 jmp main_menu_loop
 
 set_mode_4:
                 .set_mode crtc_10KB,palette_mono,$88
-                .show_crtc_address_in_LEDs
                 jmp main_menu_loop
 
 teletext_engineering_test:
@@ -437,20 +454,66 @@ set_mode_7:
 
                 .section bits_test
 bits_test: .proc
+                .if model_bplus||model_master
+                lda #$80
+                sta romsel
+                .endif
+
+                .if model_bplus
+                lda #$00             ; shadow off
+                sta system_via.t1l_l ; acccon value
+                .elif model_master
+                .cerror *>=$c000&&*<$e000
+                lda #acccon.y   ; HAZEL on, display main RAM
+                tsb acccon
+                .endif
 
 fill_00:
                 lda #$00
 fill:
+                sta system_via.t1l_h
                 ldx #0
+                
+                .if model_bplus||model_master
+                .deactivate_shadow
+                .endif
+                
 fill_loop:
-                .for _i=0,_i<128,_i+=1
-                sta _i*256,x
+                lda system_via.t1l_h
+                
+                ; fill main RAM
+                .for _i=0,_i<$80,_i+=1
+                sta test_page_address(_i),x
                 .endfor
+
+                .if model_bplus||model_master
+
+                ; fill ANDY/HAZEL
+                .for _i=$80,_i<$b0,_i+=1
+                sta test_page_address(_i),x
+                .endfor
+
+                ; fill shadow RAM
+                .activate_shadow
+                lda system_via.t1l_h
+                .for _i=$b0,_i<$100,_i+=1
+                sta test_page_address(_i),x
+                .endfor
+                .deactivate_shadow
+
+                .endif
+
                 inx
                 bne fill_loop
 
 test_loop:
+                .if model_bplus
+                lda system_via.t1l_l
+                sta acccon
+                .endif
+                
                 handle_key key_space,toggle_address
+                lda system_via.t1l_h
                 handle_key key_0,toggle_0
                 handle_key key_1,toggle_1
                 handle_key key_2,toggle_2
@@ -462,6 +525,10 @@ test_loop:
                 handle_key key_8,fill_00
                 handle_key key_9,fill_ff
                 handle_key key_f,fill
+                .if model_bplus||model_master
+                handle_key key_m,display_main
+                handle_key key_s,display_shadow
+                .endif
                 jmp test_loop
 
 fill_ff:
@@ -500,61 +567,70 @@ toggle_7:
                 eor #$80
                 jmp fill
 
+                .if model_bplus||model_master
+display_main:
+                .if model_bplus
+                lda #0
+                sta system_via.t1l_l
+                .else
+                lda #acccon.d
+                trb acccon
+                .endif
+                jmp test_loop
+
+display_shadow:
+                .if model_bplus
+                lda #$80
+                sta system_via.t1l_l
+                .else
+                lda #acccon.d
+                tsb acccon
+                .endif
+                jmp test_loop
+
+                .endif
+
 toggle_address:
-                .cycle_crtc_address
-                .show_crtc_address_in_LEDs
+                lda #12
+                sta $fe00
+                lda $fe01
+                cmp #$20
+                bcs cycle_done  ; taken if mode 7 - don't adjust
+                clc
+                adc #$20>>3     ; +8 KB
+                cmp #$10        ; past end of RAM?
+                bcc got_addr    ; taken if ok
+                lda #$00        ; reset address
+got_addr:
+                sta $fe01       ; update address
+cycle_done:
+                
+                and #%00001100  ; extract 8 KB region index
+                
+                ; Reflect address in LEDs. Only bits 0-3 of ORB are
+                ; outputs so bits 4-7 in the value written can be
+                ; anything.
+                asl a           ; %000xy000
+                eor #%00011000  ; since 1=LED off, 0=LED on
+                ora #7          ; do shift lock LED
+                sta system_via.orb
+                lsr a
+                and #8          ; mask off just LED state
+                ora #6          ; do caps lock LED
+                sta system_via.orb
+                
                 jmp test_loop
                .endproc
                .endsection
                 
 ;-------------------------------------------------------------------------
 
-; Page numbers:
-
-; Range         B         B+          Master
-; -----         -         --          ------
-;  $00 -  $7F   Main RAM
-;  $80 -  $90   -         ANDY        ANDY
-;  $A0 -  $AF   -         ANDY        HAZEL
-;  $B0 -  $FF   -         Shadow RAM  Shadow RAM
-; $180 - $1BF   -         -           Sideways RAM
-;
-; The sideways RAM bank being tested is not part of the page number.
-; It's read from ROMSEL (hence lack of equivalent B+128
-; functionality).
-                
-test_page_address: .function page
-                .if page>=0&&page<$80
-                ; main RAM
-_addr=page*256
-                .elsif model_bplus&&page>=$80&&page<$b0
-_addr=page*256
-                .elsif (model_bplus||model_master)&&page>=$b0&&page<$100
-                .if model_bplus
-                ; access to this region is only possible from
-                ; instructions fetched from a particular address
-                ; range.
-                .cerror !(*>=$c000&&*<$e000)
-                .endif
-_addr=(page-($b0-$30))*256
-                .elsif model_master&&page>=$80&&page<$90
-_addr=page*256
-                .elsif model_master&&page>=$90&&page<$b0
-                ; code accessing this region should be placed elsewhere!
-                .cerror *>=$c000&&*<$e000
-_addr=$c000+(page-$90)*256
-                .elsif model_master&&page>=$180&&page<$1c0
-_addr=(page&$ff)*256
-                .else
-                .error format("invalid page number: $%02x (%d)",page,page)
-                .endif
-                .endfunction _addr
+                .section memory_test
                 
 test_fill_iteration: .segment page
                 sta test_page_address(\page),y
                 .endsegment
 
-                .section memory_test
 test_check_iteration: .segment page
                 lda test_page_address(\page),y ; fetch memory byte
                 eor patterns,x                 ; get differences from pattern
@@ -643,6 +719,7 @@ test:
                 stx system_via.orb
 
                 .if model_master
+page_in_hazel:
                 ; page in HAZEL
                 .cerror *>=$c000&&*<$e000
                 lda #acccon.y
