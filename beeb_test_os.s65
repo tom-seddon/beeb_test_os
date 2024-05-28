@@ -308,8 +308,6 @@ reset:
                 lda system_via.ddrb
                 cmp #%00001111
                 bne +
-                lda system_via.acr
-                bne +
 
                 ; Looks like this isn't a power-on boot
                 dey
