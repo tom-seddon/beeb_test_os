@@ -119,10 +119,12 @@ There's a PNG here to show you what to expect:
 
 Lights both LEDs and constantly fills memory with a series of
 patterns, checking the values didn't change when read back. You should
-see a bunch of patterns on screen as it runs. The test runs itself,
-and if there's an error it will switch the LEDs off and display a
-report. The report uses mode 4 (if testing in modes 0 or 4), or mode 7
-(if testing in mode 7).
+see a bunch of patterns on screen as it runs. (If running in mode 0 on
+a B+/B+128, a flickering region on the display is normal.)
+
+The test runs indefinitely, and if there's an error it will switch the
+LEDs off and display a report. The report uses mode 4 (if testing in
+modes 0 or 4), or mode 7 (if testing in mode 7).
 
 The error report consists of two rows of large text. The first row
 shows the problem address (4 or 5 hex digits - see below), and the
@@ -257,8 +259,9 @@ Type `make` from the root of the working copy.
 
 The build process is supposed to be silent when there are no errors.
 
-The output is a ROM images, as described above, in folders inside
-`build`: `build/16` (16 KB ROMs), `build/32` (32 KB ROMs), and so on.
+The output is multiple ROM images, as described above, in folders
+inside `build`: `build/16` (16 KB ROMs), `build/32` (32 KB ROMs), and
+so on.
 
 # Licence
 
