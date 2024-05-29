@@ -131,8 +131,8 @@ In both cases it should like this: [./colour_test_screen.png](./colour_test_scre
 
 Lights both LEDs and constantly fills memory with a series of
 patterns, checking the values didn't change when read back. You should
-see a bunch of patterns on screen as it runs. (If running in mode 0 on
-a B+/B+128, a flickering region on the display is normal.)
+see a bunch of patterns on screen as it runs. (If running in mode 0 or
+2 on a B+/B+128, a flickering region on the display is normal.)
 
 The test runs indefinitely, and if there's an error it will switch the
 LEDs off and display a report. The report uses mode 7 if testing in
