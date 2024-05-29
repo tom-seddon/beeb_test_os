@@ -395,8 +395,10 @@ main_menu_loop:
                 .handle_key key_m,memory_test
                 .handle_key key_b,bits_test
                 .handle_key key_0,set_mode_0
+                .handle_key key_2,mode_2_test_card
                 .handle_key key_4,set_mode_4
                 .handle_key key_7,set_mode_7
+                .handle_key key_8,mode_8_test_card
                 .handle_key key_e,teletext_engineering_test
                 .handle_key key_x,error
 
@@ -446,6 +448,37 @@ teletext_engineering_test:
 set_mode_7:
                 .set_mode crtc_teletext,-1,$4a
                 jmp main_menu_loop
+
+mode_2_test_card:
+                .set_mode crtc_20KB,palette_mode2,$f4
+                ldx #0
+-
+                .for _i=0,_i<8,_i+=1
+                lda #((_i>>2&1)*3<<4)|((_i>>1&1)*3<<2)|((_i&1)*3)
+                .for _j=0,_j<10,_j+=1
+                sta 0+(_i*10+_j)*256,x
+                .endfor
+                .endfor
+                inx
+                bne -
+                
+                jmp main_menu_loop
+
+mode_8_test_card:
+                .set_mode crtc_10KB,palette_mode2,$00
+                ldx #0
+-
+                .for _i=0,_i<8,_i+=1
+                lda #((_i>>2&1)*3<<4)|((_i>>1&1)*3<<2)|((_i&1)*3)
+                .for _j=0,_j<5,_j+=1
+                sta 0+(_i*5+_j)*256,x
+                .endfor
+                .endfor
+                inx
+                bne -
+                
+                jmp main_menu_loop
+
                 .endsection
 
 ;-------------------------------------------------------------------------
@@ -1052,6 +1085,13 @@ crtc_10KB: .block ;MODEs 4/5
 palette_mono:
                 .for _i=0,_i<16,_i+=1
                 .byte _i<<4|(_i<8?7:0)
+                .endfor
+
+;-------------------------------------------------------------------------
+
+palette_mode2:
+                .for _i=0,_i<16,_i+=1
+                .byte _i<<4|((_i&7)^7)
                 .endfor
 
 ;-------------------------------------------------------------------------

@@ -87,6 +87,9 @@ You can tap the following keys:
 
 - `0`, `4`, `7` - select display mode and wait for another option
 
+- `2`, `8` - select mode 2/"mode 8", display colour test screen (see
+  below), and wait for another option
+
 - `E` - show Ceefax engineering test page and wait for another option
 
 - `M` - main memory test
@@ -104,7 +107,7 @@ mask shown are meaningless.)
 
 Should look like this Mode 7: [./mode_7_failure.png](./mode_7_failure.png)
 
-Should look like this in Mode 0/Mode 4:
+Should look like this otherwise:
 [./mode_4_failure.png](./mode_4_failure.png) (this is a bitmap Mode 4
 display, not using the teletext-style addressing mode)
 
@@ -115,6 +118,15 @@ Selects mode 7 and shows the Ceefax engineering test page.
 There's a PNG here to show you what to expect:
 [./engtest.png](./engtest.png).
 
+## Colour test screen
+
+Selects mode 2 or "mode 8" (80x256, 16 colours) and displays a colour
+test card. The screen is divided into 8 rows, showing the standard 8
+BBC colours in the standard order: from top to bottom, black, red,
+green, yellow, blue, magenta, cyan and white.
+
+In both cases it should like this: [./colour_test_screen.png](./colour_test_screen.png)
+
 ## Main memory test
 
 Lights both LEDs and constantly fills memory with a series of
@@ -123,8 +135,8 @@ see a bunch of patterns on screen as it runs. (If running in mode 0 on
 a B+/B+128, a flickering region on the display is normal.)
 
 The test runs indefinitely, and if there's an error it will switch the
-LEDs off and display a report. The report uses mode 4 (if testing in
-modes 0 or 4), or mode 7 (if testing in mode 7).
+LEDs off and display a report. The report uses mode 7 if testing in
+mode 7, or mode 4 if testing in another mode.
 
 The error report consists of two rows of large text. The first row
 shows the problem address (4 or 5 hex digits - see below), and the
@@ -192,7 +204,7 @@ Tap 9 to fill memory with $ff.
 On B+/Master, tap M to display main memory (the default) and S to
 display shadow memory.
 
-In mode 0 or 4, tap SPACE to adjust the screen address. (The start
+If not in mode 7, tap SPACE to adjust the screen address. (The start
 address in mode 7 is fixed.) The address is indicated by the caps
 lock/shift lock LEDs:
 
@@ -203,9 +215,9 @@ lock/shift lock LEDs:
 | on | off | $4000 |
 | on | on | $6000 |
   
-If the screen wraps round (e.g., displaying Mode 0 starting at $4000),
-the flashing cursor indicates where the wraparound back to $3000
-occurred. The wraparound size is always 20 KB.
+If the screen wraps round (e.g., displaying Mode 0 or 2 starting at
+$4000), the flashing cursor indicates where the wraparound back to
+$3000 occurred. The wraparound size is always 20 KB.
 
 # Other testing tools
 
