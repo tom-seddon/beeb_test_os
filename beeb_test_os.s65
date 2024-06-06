@@ -17,6 +17,14 @@ master_num_sideways_ram_banks=4
 
 master_test_sideways_ram=master_num_sideways_ram_banks>0
 
+                .if model_b||model_bplus
+                .cpu '6502'
+                .elsif model_master
+                .cpu '65c02'
+                .else
+                .error "unknown model type"
+                .endif
+
 ;-------------------------------------------------------------------------
 
 *=$c000

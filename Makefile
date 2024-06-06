@@ -37,12 +37,9 @@ BUILD:=$(abspath ./build)
 build: _folders
 	$(_V)$(PYTHON) glyphs_data.py > "$(BUILD)/glyphs_data.generated.s65"
 
-	$(_V)$(MAKE) _build_b MODEL=b
-	$(_V)$(MAKE) _build_b MODEL=bplus
-	$(_V)$(MAKE) _build_master FIRST=4 NUM=4 SUFFIX=
-	$(_V)$(MAKE) _build_master FIRST=4 NUM=2 SUFFIX=.sw45
-	$(_V)$(MAKE) _build_master FIRST=6 NUM=2 SUFFIX=.sw67
-	$(_V)$(MAKE) _build_master FIRST=0 NUM=0 SUFFIX=.swno
+	$(_V)$(MAKE) _build MODEL=b
+	$(_V)$(MAKE) _build MODEL=bplus
+	$(_V)$(MAKE) _build MODEL=master
 
 	$(_V)$(SHELLCMD) mkdir "$(BUILD)/16" "$(BUILD)/32" "$(BUILD)/64" "$(BUILD)/128"
 	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 16 -n 32 "$(BUILD)/beeb_test_os.b*.bin"
@@ -51,15 +48,15 @@ build: _folders
 
 	$(_V)$(SHELLCMD) rm-file -f "$(BUILD)/multios.bin"
 
-.PHONY:_build_b
-_build_b: _STEM:=beeb_test_os.$(MODEL)
-_build_b:
-	$(_V)$(TASS) beeb_test_os.s65 --m65xx -Dmodel_$(MODEL)=true "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
+.PHONY:_build
+_build: _STEM:=beeb_test_os.$(MODEL)
+_build:
+	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_$(MODEL)=true "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
 
-.PHONY:_build_master
-_build_master: _STEM:=beeb_test_os.master$(SUFFIX)
-_build_master:
-	$(_V)$(TASS) beeb_test_os.s65 --m65c02 -Dmodel_master=true -Dmaster_first_sideways_ram_bank=$(FIRST) -Dmaster_num_sideways_ram_banks=$(NUM) "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
+# .PHONY:_build_master
+# _build_master: _STEM:=beeb_test_os.master$(SUFFIX)
+# _build_master:
+# 	$(_V)$(TASS) beeb_test_os.s65 --m65c02 -Dmodel_master=true -Dmaster_first_sideways_ram_bank=$(FIRST) -Dmaster_num_sideways_ram_banks=$(NUM) "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
 
 ##########################################################################
 ##########################################################################
