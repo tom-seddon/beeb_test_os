@@ -174,21 +174,21 @@ selecting at each point, as follows:
 
 Caps lock LED off, shift lock LED on.
 
-Press `Y` to pause briefly (~1/6th sec) after each test, giving any
+Tap `Y` to pause briefly (~1/6th sec) after each test, giving any
 problems caused by faulty memory refresh a chance to reveal
 themselves. This is the mode used by the ordinary memory test.
 
-Press `L` to pause for longer (~1 sec) after each test, giving refresh
+Tap `L` to pause for longer (~1 sec) after each test, giving refresh
 problems even more chance to show themselves.
 
-Press `N` to test continuously. The continuous memory accesses should
+Tap `N` to test continuously. The continuous memory accesses should
 serve to keep the memory refreshed, masking any problems.
 
 ### Memory region (B/Master only)
 
 Caps lock LED on, shift lock LED off.
 
-Press a key to select the memory region to test. The memory is divided
+Tap a key to select the memory region to test. The memory is divided
 up into regions corresponding to a group of ICs that you might want to
 test separately.
 
