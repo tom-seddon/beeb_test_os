@@ -179,7 +179,7 @@ problems even more chance to show themselves.
 Press `N` to test continuously. The continuous memory accesses should
 serve to keep the memory refreshed, masking any problems.
 
-### Memory region
+### Memory region (B/Master only)
 
 Caps lock LED on, shift lock LED off.
 
