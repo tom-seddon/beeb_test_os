@@ -7,15 +7,11 @@
 model_b=false
 model_bplus=false
 model_master=false
-master_first_sideways_ram_bank=4
-master_num_sideways_ram_banks=4
                 .endweak
 
                 .if (model_b?1:0)+(model_bplus?1:0)+(model_master?1:0)!=1
                 .error "must specify single model type"
                 .endif
-
-master_test_sideways_ram=master_num_sideways_ram_banks>0
 
                 .if model_b||model_bplus
                 .cpu '6502'
@@ -25,6 +21,20 @@ master_test_sideways_ram=master_num_sideways_ram_banks>0
                 .error "unknown model type"
                 .endif
 
+;-------------------------------------------------------------------------
+
+option_test_refresh=1
+option_test_refresh_long_delay=2
+                
+                .if model_b
+option_test_lower=16
+option_test_upper=32
+                .elsif model_master
+option_test_main_ram=16
+option_test_sw_banks_45=32
+option_test_sw_banks_67=64
+                .endif
+                
 ;-------------------------------------------------------------------------
 
 *=$c000
@@ -230,6 +240,24 @@ loop2:
                 
                 .endmacro
 
+;-------------------------------------------------------------------------
+
+                .if model_master
+; Z=0 if current bank should be tested
+;
+; Preserves X/Y
+test_check_romsel_bank: .macro
+                lda romsel
+                and #2          ; 4->0, 5->0, 6->2, 7->2
+                cmp #2          ; C=1 if 6/7
+                lda #option_test_sw_banks_45 ; assume 4/5
+                bcc _done
+                lda #option_test_sw_banks_67
+_done:
+                and system_via.t1l_l
+                .endmacro
+                .endif
+                
 ;-------------------------------------------------------------------------
 
 error_screen: .macro mode
@@ -687,13 +715,108 @@ memory_test: .proc
                 ; the timer times out more often.
                 lda #$ff
                 sta system_via.t1l_h ; keep bits
-                
+
+                .if model_b
+                lda #option_test_refresh|option_test_lower|option_test_upper
+                .elsif model_bplus
+                lda #option_test_refresh
+                .elsif model_master
+                lda #option_test_refresh|option_test_main_ram|option_test_sw_banks_45|option_test_sw_banks_67
+                .endif
+                sta system_via.t1l_l
+
                 ldx #key_shift
                 stx system_via.ora_no_handshake
                 bit system_via.ora_no_handshake
                 bpl test
 
+read_test_refresh_option:
+                ldx #8+6        ; caps lock off
+                stx system_via.orb
+                ldx #0+7        ; shift lock on
+                stx system_via.orb
+
+                ; Read memory refresh option
+read_test_refresh_option_loop:
+                handle_key key_y,read_memory_region_option
+                handle_key key_n,test_refresh_off
+                handle_key key_l,test_refresh_long
+                jmp read_test_refresh_option_loop
+
+test_refresh_long:
+                lda system_via.t1l_l
+                ora #option_test_refresh_long_delay
+                sta system_via.t1l_l
+                jmp read_memory_region_option
+test_refresh_off:
+                lda system_via.t1l_l
+                and #(~option_test_refresh)&$ff
+                sta system_via.t1l_l
+                .cerror *!=read_memory_region_option
+read_memory_region_option:
+                .if model_b||model_master
+                ldx #0+6        ; caps lock on
+                stx system_via.orb
+                ldx #8+7        ; shift lock off
+                stx system_via.orb
+read_memory_region_loop:
+                handle_key key_a,read_msn
+                .if model_b
+                .handle_key key_l,test_b_lower
+                .handle_key key_u,test_b_upper
+                .elsif model_master
+                .handle_key key_m,test_master_main
+                .handle_key key_s,test_master_sideways_4567
+                .handle_key key_4,test_master_sideways_45
+                .handle_key key_6,test_master_sideways_67
+                .else
+                .error
+                .endif
+                jmp read_memory_region_loop
+                .endif
+                
+                .if model_b
+test_b_lower:
+                lda system_via.t1l_l
+                and #(~option_test_upper)&$ff
+                sta system_via.t1l_l
+                jmp read_msn
+                
+test_b_upper:
+                lda system_via.t1l_l
+                and #(~option_test_lower)&$ff
+                sta system_via.t1l_l
+                jmp read_msn
+                .endif
+
+                .if model_master
+test_master_main:
+                lda system_via.t1l_l
+                and #(~(option_test_sw_banks_45|option_test_sw_banks_67))&$ff
+                sta system_via.t1l_l
+                jmp read_msn
+
+test_master_sideways_4567:
+                lda system_via.t1l_l
+                and #(~option_test_main_ram)&$ff
+                sta system_via.t1l_l
+                jmp read_msn
+                
+test_master_sideways_45:
+                lda system_via.t1l_l
+                and #(~(option_test_main_ram|option_test_sw_banks_67))&$ff
+                sta system_via.t1l_l
+                jmp read_msn
+
+test_master_sideways_67:
+                lda system_via.t1l_l
+                and #(~(option_test_main_ram|option_test_sw_banks_45))&$ff
+                sta system_via.t1l_l
+                jmp read_msn
+                .endif
+                
 read_msn:
+                ; Read ignore masks.
                 ldx #8+6        ; caps lock off
                 stx system_via.orb
                 ldx #8+7        ; shift lock off
@@ -778,16 +901,39 @@ fill_loop:
                 sta romsel
                 .endif
 
-                lda patterns,x
+                .if model_b
+                lda system_via.t1l_l
+                and #option_test_lower
+                beq test_upper
+                .elsif model_master
+                lda system_via.t1l_l
+                and #option_test_main_ram
+                beq test_sideways_ram
+                .endif
 
-                ; fill main RAM                
-                .for _i=0,_i<$80,_i+=1
+                ; fill lower RAM
+                lda patterns,x
+                .for _i=0,_i<$40,_i+=1
+                .test_fill_iteration _i
+                .endfor
+
+                .if model_b
+test_upper:
+                lda system_via.t1l_l
+                and #option_test_upper
+                beq fill_next
+                .endif
+                
+                ; fill upper RAM
+                lda patterns,x
+                .for _i=$40,_i<$80,_i+=1
                 .test_fill_iteration _i
                 .endfor
 
                 .if model_bplus||model_master
                 
                 ; fill ANDY
+                lda patterns,x
                 .for _i=$80,_i<$b0,_i+=1
                 .test_fill_iteration _i
                 .endfor
@@ -802,24 +948,29 @@ fill_loop:
 
                 .endif
 
-                .if model_master&&master_test_sideways_ram
+                .if model_master
+test_sideways_ram:
 
                 ; fill banks 4-7. Also disable ANDY
-                lda #master_first_sideways_ram_bank
+                lda #4
                 sta romsel
 rom_fill_loop:
+                .test_check_romsel_bank
+                beq rom_fill_next
+                
                 lda patterns,x
                 .for _i=$180,_i<$1c0,_i+=1
                 .test_fill_iteration _i
                 .endfor
-
+rom_fill_next:
                 inc romsel
                 lda romsel
-                cmp #master_first_sideways_ram_bank+master_num_sideways_ram_banks
+                cmp #8
                 bne rom_fill_loop
 
                 .endif
 
+fill_next:
                 clc
                 txa
                 adc system_via.acr
@@ -829,16 +980,11 @@ rom_fill_loop:
                 iny
                 bne fill_loop
 
-                ; Delay ~165 ms - give memory time to decay, if
-                ; refresh isn't working properly.
-                ldy #0
-                ldx #0
-decay_loop:
-                inx
-                bne decay_loop
-                iny
-                bne decay_loop
+                ; this region is basically full on the Master, so the
+                ; delay loop has to go elsewhere.
+                jmp delay_then_check
 
+check:
                 tsx
 check_loop:
                 .if model_bplus||model_master
@@ -846,8 +992,29 @@ check_loop:
                 lda #$80
                 sta romsel
                 .endif
+
+                .if model_b
+                lda system_via.t1l_l
+                and #option_test_lower
+                beq check_upper
+                .elsif model_master
+                lda system_via.t1l_l
+                and #option_test_main_ram
+                beq check_sideways_ram
+                .endif
                 
-                .for _i=0,_i<$80,_i+=1
+                .for _i=0,_i<$40,_i+=1
+                .test_check_iteration _i
+                .endfor
+
+                .if model_b
+check_upper:
+                lda system_via.t1l_l
+                and #option_test_upper
+                beq check_next
+                .endif
+                
+                .for _i=$40,_i<$80,_i+=1
                 .test_check_iteration _i
                 .endfor
 
@@ -867,23 +1034,29 @@ check_loop:
 
                 .endif
 
-                .if model_master&&master_test_sideways_ram
-
+                .if model_master
+check_sideways_ram:
                 ; check banks 4-7. Also disable ANDY
-                lda #master_first_sideways_ram_bank
+                lda #4
                 sta romsel
 rom_check_loop:
+
+                .test_check_romsel_bank
+                beq rom_check_next
+                
                 .for _i=$180,_i<$1c0,_i+=1
                 .test_check_iteration _i
                 .endfor
 
+rom_check_next:
                 inc romsel
                 lda romsel
-                cmp #master_first_sideways_ram_bank+master_num_sideways_ram_banks
+                cmp #8
                 bne rom_check_loop
                 
                 .endif
 
+check_next:
                 clc
                 txa
                 adc system_via.acr
@@ -1116,6 +1289,36 @@ engtest:
 ;-------------------------------------------------------------------------
 
                 .section entry_points
+
+delay_then_check:
+                lda system_via.t1l_l
+                and #option_test_refresh
+                beq delay_done
+
+                lda system_via.t1l_l
+                and #option_test_refresh_long_delay
+                cmp #1
+
+                ldx #0          ; 256*5=1,275
+                ldy #0          ; 256*1,275=326,400
+                
+                lda #1          ; 1*326,400=326,400=~165 ms
+                bcc decay_loop  ; taken if not long delay
+                lda #6          ; 6*326,400=1,958,400=~1 sec
+decay_loop:
+                inx
+                bne decay_loop
+                iny
+                bne decay_loop
+                sec
+                sbc #1
+                bne decay_loop
+
+delay_done:
+                jmp memory_test.check
+                
+;-------------------------------------------------------------------------
+
 
 error:
                 ; X = page

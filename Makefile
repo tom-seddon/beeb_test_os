@@ -44,7 +44,7 @@ build: _folders
 	$(_V)$(SHELLCMD) mkdir "$(BUILD)/16" "$(BUILD)/32" "$(BUILD)/64" "$(BUILD)/128"
 	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 16 -n 32 "$(BUILD)/beeb_test_os.b*.bin"
 	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 64 "$(BUILD)/beeb_test_os.b*.bin" "$(BUILD)/beeb_test_os.master.bin"
-	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 128 "$(BUILD)/beeb_test_os.master*.bin"
+	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 128 "$(BUILD)/beeb_test_os.master.bin"
 
 	$(_V)$(SHELLCMD) rm-file -f "$(BUILD)/multios.bin"
 
@@ -81,9 +81,9 @@ clean:
 tom_laptop: _CURL:=curl --no-progress-meter
 tom_laptop:
 	$(_V)$(MAKE) build
-	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B+128 (Test OS)"
+#	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B+128 (Test OS)"
 #	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=Master 128 (Test OS)"
-#	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B (Test OS)"
+	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B (Test OS)"
 
 ##########################################################################
 ##########################################################################

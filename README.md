@@ -15,8 +15,6 @@ Program ROM and insert in specified socket.
 
 ## BBC B
 
-Tests 32 KB RAM.
-
 - `16/beeb_test_os.b.bin`
 - `32/beeb_test_os.b.bin`
 - `64/beeb_test_os.b.bin`
@@ -25,9 +23,7 @@ Insert ROM in socket IC51.
 
 ## BBC B+/BBC B+128
 
-Tests 64 KB RAM (32 KB main RAM, 20 KB shadow RAM, 12 KB extra RAM).
-
-The B+128 extra sideways RAM is not tested. Apologies!
+(Note that the B+128 sideways RAM is not tested. Sorry!)
 
 - `16/beeb_test_os.bplus.bin`
 - `32/beeb_test_os.bplus.bin`
@@ -37,23 +33,13 @@ Insert ROM in socket IC71.
 
 ## Master Compact/Olivetti PC 128 S
 
-Tests 128 KB RAM (32 KB main RAM, 20 KB shadow RAM, 4 KB ANDY, 8 KB
-HAZEL, 64 KB sideways RAM).
-
 - `64/beeb_test_os.master.bin`
 
 Insert ROM in socket IC49.
 
 ## Master 128
 
-All ROMs test 64 KB RAM (32 KB main RAM, 20 KB shadow RAM, 4 KB ANDY,
-8 KB HAZEL), plus some amount of sideways RAM. Pick the appropriate
-version according to ROMs installed in IC37/IC41.
-
-- `128/beeb_test_os.master.bin` - tests 64 KB sideways RAM
-- `128/beeb_test_os.master.sw45.bin` - tests 32 KB sideways RAM, banks 4+5
-- `128/beeb_test_os.master.sw67.bin` - tests 32 KB sideways RAM, banks 6+7
-- `128/beeb_test_os.master.swno.bin` - does not test sideways RAM
+- `128/beeb_test_os.master.bin`
 
 The MOS ROM socket is IC24. 28-pin 1 Mbit PROMs don't exist; you'll
 need an 32-pin PROM with an adapter (e.g.,
@@ -92,9 +78,9 @@ You can tap the following keys:
 
 - `E` - show Ceefax engineering test page and wait for another option
 
-- `M` - main memory test
+- `M` - memory test
 
-- `M` (while holding shift) - main memory test with ignore bits
+- `M` (while holding shift) - memory test with options
 
 - `B` - visual bits test
 
@@ -127,7 +113,7 @@ green, yellow, blue, magenta, cyan and white.
 
 In both cases it should like this: [./colour_test_screen.png](./colour_test_screen.png)
 
-## Main memory test
+## Memory test
 
 Lights both LEDs and constantly fills memory with a series of
 patterns, checking the values didn't change when read back. You should
@@ -172,21 +158,77 @@ For Master, the 5-digit addresses are as follows:
 | 68000-6bfff | 16 KB sideways RAM bank 6 (if tested) |
 | 78000-7bfff | 16 KB sideways RAM bank 7 (if tested) |
 
-## Main memory test with ignore bits
+## Main memory test with options
 
-As main memory test, but you can use the mask printed by the main
-memory test to indicate which bits to ignore, to see if the memory
-test passes if those bits are ignored.
+As main memory test, but you get to choose some options.
 
-When the test starts, both LEDs are off, indicating it's waiting for
-you to enter the mask for the bad bits. Enter it as two hex digits, as
-shown by the main memory test. The caps lock LED will light up after
-the first digit is entered, then shift lock after the second (but
-hopefully you'll see the test run so it'll be obvious).
+Watch the caps lock and shift lock LEDs to see which option you're
+selecting at each point, as follows:
 
-If a failure report is printed, the values of the ignored bits are
-treated as matching, and you will have to manually figure out what the
-combined mask for further tests should be. Apologies!
+### Memory refresh
+
+Caps lock LED off, shift lock LED on.
+
+Press `Y` to pause briefly (~1/6th sec) after each test, giving any
+problems caused by faulty memory refresh a chance to reveal
+themselves. This is the mode used by the ordinary memory test.
+
+Press `L` to pause for longer (~1 sec) after each test, giving refresh
+problems even more chance to show themselves.
+
+Press `N` to test continuously. The continuous memory accesses should
+serve to keep the memory refreshed, masking any problems.
+
+### Memory region
+
+Caps lock LED on, shift lock LED off.
+
+Press a key to select the memory region to test. The memory is divided
+up into regions corresponding to a group of ICs that you might want to
+test separately.
+
+On BBC B, the following regions can be tested:
+
+- `A` - all of memory: &0000-&7FFF inclusive. This is the region
+  tested by the ordinary memory test
+- `L` - lower RAM: &0000-&3FFF inclusive
+- `U` - upper RAM: &4000-&7FFF inclusive
+
+For a BBC B+, there are no regions, as one set of ICs covers all of
+memory. All 64 KB of main memory is always tested.
+
+On Master, the following regions can be tested:
+
+- `A` - all 128 KB of memory. This is the region tested by the
+  ordinary memory test
+- `M` - 64 KB of main memory only
+- `S` - 64 KB of sideways RAM only
+- `4` - 32 KB of sideways RAM only, banks 4 and 5
+- `6` - 32 KB of sideways RAM only, banks 6 and 7
+
+(Regions `4` and `6` are relevant for Master 128 only. You will need
+to use these if you have the PCB links set to use the onboard ROM
+sockets rather than sideways RAM.)
+
+### Ignore mask
+
+Caps lock LED off, shift lock LED off.
+
+Allows you to specify which bits in memory are actually tested. Enter
+an ignore mask: 2 hex digits, 1 bit set for each bit to be ignored
+(probably because you suspect it's broken), more significant digit
+first. The caps lock LED will light up once the first digit is
+entered, and once the second is entered the memory test will start
+straight away.
+
+Each bit in the mask indicates that bit of memory should be ignored.
+You can use the mask printed by a previous test.
+
+The ordinary memory test uses a mask of `00`, so all bits are tested.
+
+(Note that when a failure report is printed, the values of the ignored
+bits are treated as matching, and you will have to manually figure out
+what the combined mask for further tests should be. Apologies!)
 
 ## Visual bits test
 
