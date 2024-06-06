@@ -1,6 +1,11 @@
 Test OS ROM for basic diagnosis of RAM problems on a BBC B/B+/Master
 that's too broken to boot the OS as normal.
 
+For any comments/problems/suggestions/etc., please
+[make a GitHub issue](https://github.com/tom-seddon/beeb_test_os/issues)
+or post in the
+[StarDot thread](https://www.stardot.org.uk/forums/viewtopic.php?p=426927).
+
 # Installation
 
 Download ZIP file for latest release: https://github.com/tom-seddon/beeb_test_os/releases/latest
