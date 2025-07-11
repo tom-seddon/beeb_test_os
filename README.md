@@ -227,14 +227,14 @@ first. The caps lock LED will light up once the first digit is
 entered, and once the second is entered the memory test will start
 straight away.
 
-Each bit in the mask indicates that bit of memory should be ignored.
-You can use the mask printed by a previous test.
+Each set bit in the mask indicates that bit of memory should be
+ignored. The ordinary memory test uses a mask of `00`, so all bits are
+tested.
 
-The ordinary memory test uses a mask of `00`, so all bits are tested.
-
-(Note that when a failure report is printed, the values of the ignored
-bits are treated as matching, and you will have to manually figure out
-what the combined mask for further tests should be. Apologies!)
+You can use the mask printed by a previous test. if a memory test
+fails, any ignored bits are treated as failing too, producing a
+combined mask that can be used for another tests that ignores the
+newly-discovered failing bit(s).
 
 ## Visual bits test
 

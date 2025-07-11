@@ -1327,6 +1327,14 @@ error:
 
                 txs                  ; save page
                 sta system_via.t1l_l ; incorrect bits
+
+                ; Add ignore bits to incorrect bits, so the displayed
+                ; mask is suitable for use for a subsequent run.
+                lda system_via.t1l_h ; get keep bits
+                eor #$ff             ; form ignore bits
+                ora system_via.t1l_l ; add incorrect bits
+                sta system_via.t1l_l ; store incorrect bits
+
                 sty system_via.t1l_h ; page offset
 
                 .if model_bplus||model_master
