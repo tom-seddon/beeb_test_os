@@ -43,6 +43,7 @@ build: _folders
 
 	$(_V)$(SHELLCMD) mkdir "$(BUILD)/16" "$(BUILD)/32" "$(BUILD)/64" "$(BUILD)/128"
 	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 16 -n 32 "$(BUILD)/beeb_test_os.b*.bin"
+	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 32 "$(BUILD)/beeb_test_os.master.bin"
 	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 64 "$(BUILD)/beeb_test_os.b*.bin" "$(BUILD)/beeb_test_os.master.bin"
 	$(_V)$(PYTHON) duplicate_roms.py -o "$(BUILD)" -n 128 "$(BUILD)/beeb_test_os.master.bin"
 

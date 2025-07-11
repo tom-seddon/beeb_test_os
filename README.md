@@ -38,6 +38,7 @@ Insert ROM in socket IC71.
 
 ## Master Compact/Olivetti PC 128 S
 
+- `32/beeb_test_os.master.bin`
 - `64/beeb_test_os.master.bin`
 
 Insert ROM in socket IC49.
