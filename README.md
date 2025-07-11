@@ -26,6 +26,9 @@ Program ROM and insert in specified socket.
 
 Insert ROM in socket IC51.
 
+If LK25 has been changed for testing purposes, please ensure it is set
+to North, the standard position for a 32 KB BBC B.
+
 ## BBC B+/BBC B+128
 
 (Note that the B+128 sideways RAM is not tested. Sorry!)
@@ -52,23 +55,149 @@ need an 32-pin PROM with an adapter (e.g.,
 https://mdfs.net/Info/Comp/BBC/SROMs/MegaROM.htm), or one of the
 commonly available switchable flash ROM MOS devices.
 
-# Use
+(It's not plug and play, but with a bit of effort you can reportedly
+also use the 64 KB ROM image, `64/beeb_test_os.master.bin`. See this
+StarDot thread:
+https://www.stardot.org.uk/forums/viewtopic.php?t=30389)
+
+# How to use the test OS
+
+The system will need a functioning keyboard and system VIA and you'll
+need a display.
+
+Program the test OS into a ROM as above, plug the ROM into the
+appropriate socket, and power on the system. The expected result is a
+teletext display, possibly empty, possibly showing some random junk
+(don't worry about the exact contents), with flashing caps lock/shift
+lock LEDs. The flashing LEDs indicate the ROM has initialised and is
+ready.
+
+(If you don't get a steady display, or the LEDs don't flash -
+something is wrong that's out of the scope of this ROM.)
+
+You can get the ROM back into this initial state by pressing BREAK. It
+might not always be obvious from the display that anything has
+happened, so watch for the flashing LEDs, which is unique to the
+initial state.
+
+First thing to try: press `M` for a standard memory test. A sequence
+of values will be written to memory and read back, and any
+discrepancies will be reported. You'll see the screen fill with
+various changing characters as it goes. This process will run until it
+finds a problem, with no time limit - so if it's still running after
+you've left it overnight, there's no obvious problem with the RAM at
+least.
+
+If a discrepancy is found, you'll see a display with two hex numbers:
+a 4- or 5-digit one, and a 2-digit one.
+
+## B
+
+A failure from the standard memory test gives you an indication that
+there's an error, but you'll need to run additional tests to check for
+further problems and to narrow it down to the probably failing ICs.
+
+So next thing to do is a memory test with options - please refer to
+the instructions below for the details. Select `Y` for the memory
+refresh mode, `L` for the memory region, and use `00` for the ignore
+mask. If you get an error from this, repeat the process, but this
+time, for the ignore mask, use the 2-digit value displayed on the
+failure screen. Keep going until you get a successful run, or until
+the ignore mask would be `FF`. Note the final ignore mask either way
+and read it off from the [B table for the L
+region](./docs/table.b.L.md) to figure out the likely problem ICs.
+
+That will test half of the RAM ICs. For the other half, repeat the
+process as above, this time selecting `H` as the memory region. Use
+the [B table for the H region](./docs/table.b.H.md) to figure out the
+likely problem ICs.
+
+## B+
+
+A failure from the standard memory test gives you an indication that
+there's an error, but you'll need to run additional tests to check for
+further errors. So the next thing to do is a memory test with
+options - refer to the instructions below for details. Select `Y` for
+the memory refresh mode, and use the 2-digit value from the failure
+screen for the ignore mask.
+
+(The memory region option doesn't apply to the B+.)
+
+If you get an error from this, repeat the process, but this time, for
+the ignore mask, use the 2-digit value displayed on the failure
+screen. Keep going until you get a successful run or until the ignore
+mask would be `FF`. Note the final ignore mask either way, and read it
+off from the [B+ table](./docs/table.bplus.md) to figure out the
+likely problem ICs.
+
+## Master 128
+
+A failure from the standard memory test gives you an indication that
+there's an error, but you'll need to run additional tests to check for
+further problems and to narrow it down to the probably failing ICs. So
+next thing to do is a memory test with options - please refer to the
+instructions below for the details. Select `Y` for the memory refresh
+mode, `M` for the memory region, and use `00` for the ignore mask.
+
+If you get an error, repeat the process, this time using the 2-digit
+value displayed as the ignore mask. Keep going until you get a
+successful run or until the ignore mask ends up `FF`. Note the final
+ignore mask, and look it up in the [Master 128 table for the M
+region](./docs/table.master_128.M.md) to find the likely problem ICs.
+
+That wil test half of the RAM ICs. For the other half, do the same
+thing again, but with a different region, depending on the paged
+ROM/RAM link setup (see Master Reference Manual part 1, page F.5.5),
+as per the following table.
+
+| LK18 | LK19 | Region | Notes                             |
+|------|------|--------|-----------------------------------|
+| West | West | `S`    | Default setup, most likely        |
+| East | West | `6`    |                                   |
+| West | East | `4`    |                                   |
+| East | East | N/A    | Skip this whole step in this case |
+
+Whether you test the `S`, `4` or `6` region, look up the result in the
+[Master 128 table for the S region](./docs/table.master_128.S.md) to
+find the likely problem ICs.
+
+## Master Compact
+
+A failure from the standard memory test gives you an indication that
+there's an error, but you'll need to run additional tests to check for
+further problems and to narrow it down to the probably failing ICs. So
+next thing to do is a memory test with options - please refer to the
+instructions below for the details. Select `Y` for the memory refresh
+mode, `M` for the memory region, and use `00` for the ignore mask.
+
+If you get an error, repeat the process, this time using the 2-digit
+value displayed as the ignore mask. Keep going until you get a
+successful run or until the ignore mask ends up `FF`. Look it up in
+the [Master Compact table for the M
+region](./docs/table.master_compact.M.md) to find the likely problem
+ICs.
+
+That wil test half of the RAM ICs. For the other half, do the same
+thing again, this time for region `S`. Look the failure result up in
+the [Master Compact table for the S
+region](./docs/table.master_compact.S.md) to find the likely problem
+ICs.
+
+# Reference manual
 
 You'll need a functioning keyboard and system VIA. The system ideally
 needs to be able to produce a display of some kind - some basic
 testing is posible without (the keyboard LEDs do show some
 information) but you don't get much info that way.
 
-If you are directed to "tap" a key, that means the action will
-not occur until the key is released.
-
 Power on BBC Micro.
 
-On startup, the test OS does 5 writes of $00 to address $0000, does
-some minimal system initialisation (including attempting to silence
-the sound), then does 10 writes of $00 to address $0000. (If following
-along, watch CPU A15 and CPU A8 - all other writes on startup should
-be to the I/O region and the stack.)
+On startup, to make it easier to monitor the startup process with a
+logic analyzer, the test OS does 5 writes of $00 to address $0000,
+does some minimal system initialisation (including attempting to
+silence the sound), then does 10 writes of $00 to address $0000.
+(Watch CPU A15 and CPU A8 - all other writes on startup should be to
+the I/O region and the stack.)
 
 If this is a power-on reset, it selects mode 7.
 
@@ -203,7 +332,7 @@ On BBC B, the following regions can be tested:
 For a BBC B+, there are no regions, as one set of ICs covers all of
 memory. All 64 KB of main memory is always tested.
 
-On Master, the following regions can be tested:
+On Master 128 or Master Compact, the following regions can be tested:
 
 - `A` - all 128 KB of memory. This is the region tested by the
   ordinary memory test

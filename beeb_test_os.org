@@ -7,3 +7,81 @@
 * minipro
 
 : minipro --write beeb_test_os.bin --device 'TMS27C128@DIP28'
+
+* ICs
+
+** B
+
+| Region | Bit | IC   |
+|--------+-----+------|
+| CAS1   |   7 | IC60 |
+| CAS1   |   6 | IC59 |
+| CAS1   |   5 | IC58 |
+| CAS1   |   4 | IC57 |
+| CAS1   |   3 | IC56 |
+| CAS1   |   2 | IC55 |
+| CAS1   |   1 | IC54 |
+| CAS1   |   0 | IC53 |
+| CAS0   |   7 | IC68 |
+| CAS0   |   6 | IC67 |
+| CAS0   |   5 | IC66 |
+| CAS0   |   4 | IC65 |
+| CAS0   |   3 | IC64 |
+| CAS0   |   2 | IC63 |
+| CAS0   |   1 | IC62 |
+| CAS0   |   0 | IC61 |
+
+On B, CAS1 is the upper 16 KB and CAS0 is the lower 16 KB.
+
+Link 25:
+
+| State | What      |
+|-------+-----------|
+| Open  | CAS0 only |
+| North | CAS0+CAS1 |
+| South | CAS1 only |
+
+(Open or South means 16 KB RAM.)
+
+** B+
+
+| Bit | IC   |
+|-----+------|
+|   7 | IC67 |
+|   6 | IC66 |
+|   5 | IC65 |
+|   4 | IC64 |
+|   3 | IC61 |
+|   2 | IC60 |
+|   1 | IC56 |
+|   0 | IC55 |
+
+** Master 128
+
+M:
+
+IC23 = D0-3
+IC17 = D4-7
+
+S:
+
+IC26 = D0-3
+IC18 = D4-7
+
+(IC26+IC18 receive additional AA16 signal. Presumably the ICs for
+sideways RAM?)
+
+** Master Compact
+
+M:
+
+IC35 = D0-3
+IC41 = D4-7
+
+S:
+
+IC36 = D0-3
+IC47 = D4-7
+
+(IC36+IC47 receive additional AA16 signal, also passed to the ROMs -
+so presumably these are the ICs for sideways RAM?)
