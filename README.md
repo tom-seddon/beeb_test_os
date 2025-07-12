@@ -101,7 +101,9 @@ So next thing to do is a memory test with options - press BREAK to get
 back to the initial state, then do `SHIFT`+`M`, then follow [the
 memory test with options instructions
 below](#main-memory-test-with-options), selecting `Y` for the memory
-refresh mode, `L` for the memory region, and `00` for the ignore mask.
+refresh mode, `L` for the memory region, and using `00` for the ignore
+mask.
+
 If you get an error from this, repeat the process, but this time, for
 the ignore mask, use the 2-digit value displayed on the failure
 screen. Keep going until you get a successful run, or until the ignore
@@ -118,10 +120,12 @@ likely problem ICs.
 
 A failure from the standard memory test gives you an indication that
 there's an error, but you'll need to run additional tests to check for
-further errors. So the next thing to do is a memory test with
-options - refer to the instructions below for details. Select `Y` for
-the memory refresh mode, and use the 2-digit value from the failure
-screen for the ignore mask.
+further errors. So next thing to do is a memory test with options -
+press BREAK to get back to the initial state, then do `SHIFT`+`M`,
+then follow [the memory test with options instructions
+below](#main-memory-test-with-options), selecting `Y` for the memory
+refresh mode, and using the 2-digit value from the failure screen for
+the ignore mask.
 
 (The memory region option doesn't apply to the B+.)
 
@@ -137,9 +141,12 @@ likely problem ICs.
 A failure from the standard memory test gives you an indication that
 there's an error, but you'll need to run additional tests to check for
 further problems and to narrow it down to the probably failing ICs. So
-next thing to do is a memory test with options - please refer to the
-instructions below for the details. Select `Y` for the memory refresh
-mode, `M` for the memory region, and use `00` for the ignore mask.
+next thing to do is a memory test with options - press BREAK to get
+back to the initial state, then do `SHIFT`+`M`, then follow [the
+memory test with options instructions
+below](#main-memory-test-with-options), selecting `Y` for the memory
+refresh mode, `M` for the memory region, and using `00` as the ignore
+mask.
 
 If you get an error, repeat the process, this time using the 2-digit
 value displayed as the ignore mask. Keep going until you get a
@@ -168,9 +175,12 @@ find the likely problem ICs.
 A failure from the standard memory test gives you an indication that
 there's an error, but you'll need to run additional tests to check for
 further problems and to narrow it down to the probably failing ICs. So
-next thing to do is a memory test with options - please refer to the
-instructions below for the details. Select `Y` for the memory refresh
-mode, `M` for the memory region, and use `00` for the ignore mask.
+next thing to do is a memory test with options - press BREAK to get
+back to the initial state, then do `SHIFT`+`M`, then follow [the
+memory test with options instructions
+below](#main-memory-test-with-options), selecting `Y` for the memory
+refresh mode, `M` for the memory region, and using `00` as the ignore
+mask.
 
 If you get an error, repeat the process, this time using the 2-digit
 value displayed as the ignore mask. Keep going until you get a
