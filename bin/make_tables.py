@@ -29,8 +29,8 @@ def main2(options):
     stem='docs/table'
     
     def b():
-        rows=[]
         def region(name,ic):
+            rows=[]
             for value in range(1,256):
                 ics=[]
                 for i in range(8):
