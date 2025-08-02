@@ -100,6 +100,11 @@ tom_megarom:
 
 # The ci_ targets run on the CI server, so Linux only.
 
+.PHONY:ci_install_prerequisites
+ci_install_prerequisites:
+	sudo apt-get update
+	sudo apt-get install -y subversion
+
 .PHONY:ci_build_64tass
 ci_build_64tass:
 	svn checkout -r 3120 https://svn.code.sf.net/p/tass64/code/trunk "$(HOME)/tass64-code"
