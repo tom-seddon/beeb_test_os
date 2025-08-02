@@ -429,7 +429,8 @@ main_menu:
 main_menu_loop:
                 ; .handle_key key_caps_lock,toggle_caps_lock_led
                 .handle_key key_m,memory_test
-                .handle_key key_b,bits_test
+                .handle_key key_o,memory_test_with_options
+                .handle_key key_v,bits_test
                 .handle_key key_0,set_mode_0
                 .handle_key key_2,mode_2_test_card
                 .handle_key key_4,set_mode_4
@@ -708,8 +709,15 @@ test_check_iteration: .segment page
                 jmp error
 +
                 .endsegment
+
+memory_test_with_options:
+                sec             ; indicate options
+                jmp memory_test.begin
                 
 memory_test: .proc
+                clc             ; indicate no options
+
+begin:
                 ; the T1 latch can act as a handy 16 bits of (slightly
                 ; slow) RAM. IRQs are disabled so it doesn't matter if
                 ; the timer times out more often.
@@ -725,10 +733,7 @@ memory_test: .proc
                 .endif
                 sta system_via.t1l_l
 
-                ldx #key_shift
-                stx system_via.ora_no_handshake
-                bit system_via.ora_no_handshake
-                bpl test
+                bcc test        ; taken if no options
 
 read_test_refresh_option:
                 ldx #8+6        ; caps lock off

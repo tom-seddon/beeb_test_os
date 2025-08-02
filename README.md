@@ -98,11 +98,10 @@ there's an error, but you'll need to run additional tests to check for
 further problems and to narrow it down to the probably failing ICs.
 
 So next thing to do is a memory test with options - press BREAK to get
-back to the initial state, then do `SHIFT`+`M`, then follow [the
-memory test with options instructions
-below](#main-memory-test-with-options), selecting `Y` for the memory
-refresh mode, `L` for the memory region, and using `00` for the ignore
-mask.
+back to the initial state, then do `O`, then follow [the memory test
+with options instructions below](#main-memory-test-with-options),
+selecting `Y` for the memory refresh mode, `L` for the memory region,
+and using `00` for the ignore mask.
 
 If you get an error from this, repeat the process, but this time, for
 the ignore mask, use the 2-digit value displayed on the failure
@@ -121,8 +120,8 @@ likely problem ICs.
 A failure from the standard memory test gives you an indication that
 there's an error, but you'll need to run additional tests to check for
 further errors. So next thing to do is a memory test with options -
-press BREAK to get back to the initial state, then do `SHIFT`+`M`,
-then follow [the memory test with options instructions
+press BREAK to get back to the initial state, then do `O`, then follow
+[the memory test with options instructions
 below](#main-memory-test-with-options), selecting `Y` for the memory
 refresh mode, and using the 2-digit value from the failure screen for
 the ignore mask.
@@ -142,11 +141,10 @@ A failure from the standard memory test gives you an indication that
 there's an error, but you'll need to run additional tests to check for
 further problems and to narrow it down to the probably failing ICs. So
 next thing to do is a memory test with options - press BREAK to get
-back to the initial state, then do `SHIFT`+`M`, then follow [the
-memory test with options instructions
-below](#main-memory-test-with-options), selecting `Y` for the memory
-refresh mode, `M` for the memory region, and using `00` as the ignore
-mask.
+back to the initial state, then do `O`, then follow [the memory test
+with options instructions below](#main-memory-test-with-options),
+selecting `Y` for the memory refresh mode, `M` for the memory region,
+and using `00` as the ignore mask.
 
 If you get an error, repeat the process, this time using the 2-digit
 value displayed as the ignore mask. Keep going until you get a
@@ -176,11 +174,10 @@ A failure from the standard memory test gives you an indication that
 there's an error, but you'll need to run additional tests to check for
 further problems and to narrow it down to the probably failing ICs. So
 next thing to do is a memory test with options - press BREAK to get
-back to the initial state, then do `SHIFT`+`M`, then follow [the
-memory test with options instructions
-below](#main-memory-test-with-options), selecting `Y` for the memory
-refresh mode, `M` for the memory region, and using `00` as the ignore
-mask.
+back to the initial state, then do `O`, then follow [the memory test
+with options instructions below](#main-memory-test-with-options),
+selecting `Y` for the memory refresh mode, `M` for the memory region,
+and using `00` as the ignore mask.
 
 If you get an error, repeat the process, this time using the 2-digit
 value displayed as the ignore mask. Keep going until you get a
@@ -223,17 +220,19 @@ You can tap the following keys:
 - `2`, `8` - select mode 2/"mode 8", display colour test screen (see
   below), and wait for another option
 
-- `E` - show Ceefax engineering test page and wait for another option
+- `E` - select Mode 7, show Ceefax engineering test page, and wait for
+  another option
 
 - `M` - memory test
 
-- `M` (while holding shift) - memory test with options
+- `O` - memory test with options
 
-- `B` - visual bits test
+- `V` - visual tests: fill memory with patterns, change display base
+  address (no automatic testing here; you just look at the results)
 
-- `X` - main memory test failure example display
+- `X` - memory test failure example display
 
-## Main memory test failure example display
+## Memory test failure example display
 
 Shows an example of the memory test failure display. (The address and
 mask shown are meaningless.)
@@ -243,6 +242,9 @@ Should look like this Mode 7: [./mode_7_failure.png](./mode_7_failure.png)
 Should look like this otherwise:
 [./mode_4_failure.png](./mode_4_failure.png) (this is a bitmap Mode 4
 display, not using the teletext-style addressing mode)
+
+As with the real failure display, you'll have to press BREAK to get
+back to the initial state.
 
 ## Ceefax engineering test page
 
@@ -377,7 +379,7 @@ fails, any ignored bits are treated as failing too, producing a
 combined mask that can be used for another tests that ignores the
 newly-discovered failing bit(s).
 
-## Visual bits test
+## Visual tests
 
 Writes a configurable value - initially zero - to displayable RAM, so
 you can see the effect on screen.
