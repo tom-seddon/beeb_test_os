@@ -1,3 +1,5 @@
+#+STARTUP: overview
+
 * =.dir-locals.el=
 
 #+begin_src elisp
@@ -85,3 +87,26 @@ IC47 = D4-7
 
 (IC36+IC47 receive additional AA16 signal, also passed to the ROMs -
 so presumably these are the ICs for sideways RAM?)
+
+* error screen
+
+Store $FF in System VIA T1L-H
+
+X=page
+Y=page offset
+A=invalid bits
+
+On M128, set ROMSEL.
+
+- (Master only) ROMSEL, LSN
+- Page, MSN
+- Page, LSN
+- Page offset, MSN
+- Page offset, LSN
+
+Second row:
+
+- Invalid bits, MSN
+- Invalid bits, LSN
+
+* eof.
