@@ -7,6 +7,11 @@
 model_b=false
 model_bplus=false
 model_master=false
+;             0         1         2
+;             012345678901234567890123456789
+;             yyyymmdd-hhmmss-hash
+build_suffix="20240502-220819-4b280000"
+; (the above is the first commit for this repo)
                 .endweak
 
                 .if (model_b?1:0)+(model_bplus?1:0)+(model_master?1:0)!=1
@@ -21,6 +26,34 @@ model_master=false
                 .error "unknown model type"
                 .endif
 
+;-------------------------------------------------------------------------
+
+; extract the various parts of the build suffix
+
+xtoi2: .function l
+                .if l>='0' && l<='9'
+result:=l-'0'
+                .elsif l>='a' && l<='f'
+result:=l-'a'+10
+                .elsif l>='A' && l<='F'
+result:=l-'A'+10
+                .else
+                .error
+                .endif
+                .endfunction result
+                
+xtoi: .function string,index
+                .endfunction xtoi2(string[index+0])<<4|xtoi2(string[index+1])<<0
+                
+build_yy=xtoi(build_suffix,2)
+build_mm=xtoi(build_suffix,4)
+build_dd=xtoi(build_suffix,6)
+                .cerror build_suffix[8]!='-'
+                .cerror build_suffix[15]!='-'
+
+; first 32 bits of the commit hash.
+commit=xtoi(build_suffix,16)<<24|xtoi(build_suffix,18)<<16|xtoi(build_suffix,20)<<8|xtoi(build_suffix,22)<<0
+                
 ;-------------------------------------------------------------------------
 
 option_test_refresh=1
@@ -67,7 +100,6 @@ option_test_sw_banks_67=64
                 
                 .endif
                 
-                
                 .cerror *>$fc00,format('code overflow: *=$%04x',*)
 *=$fc00
                 .fill 768,0     ; stop I/O region appearing as a gap
@@ -78,7 +110,9 @@ option_test_sw_banks_67=64
                 .dsection entry_points
                 .dsection memory_test_patterns
                 
-*=$fffa
+*=$fffa-len(build_suffix)
+                .text build_suffix
+                .cerror *!=$fffa
                 .dsection vectors
 
 ;-------------------------------------------------------------------------
@@ -437,7 +471,8 @@ main_menu_loop:
                 .handle_key key_7,set_mode_7
                 .handle_key key_8,mode_8_test_card
                 .handle_key key_e,teletext_engineering_test
-                .handle_key key_x,error
+                .handle_key key_x,example_error
+                .handle_key key_f1,show_version
 
                 ; delay ~3,000 cycles
                 ldx #0
@@ -515,6 +550,44 @@ mode_8_test_card:
                 bne -
                 
                 jmp main_menu_loop
+
+example_error:
+                .if model_master
+                lda #$d
+                sta romsel
+                .endif
+
+                lda #$ff
+                sta system_via.t1l_h
+
+                ldx #build_yy
+                ldy #build_mm
+                lda #build_dd
+                
+                jmp error
+
+show_version:
+                lda #$ff
+                sta system_via.t1l_h
+                
+                .if model_master
+
+                lda #(commit>>28)&$f
+                sta romsel
+
+                ldx #(commit>>20)&$ff
+                ldy #(commit>>12)&$ff
+                lda #(commit>>4)&$ff
+
+                .else
+
+                ldx #(commit>>24)&$ff
+                ldy #(commit>>16)&$ff
+                lda #(commit>>8)&$ff
+
+                .endif
+
+                jmp error
 
                 .endsection
 

@@ -232,16 +232,23 @@ You can tap the following keys:
 
 - `X` - memory test failure example display
 
+- `f1` - ROM build version
+
 ## Memory test failure example display
 
-Shows an example of the memory test failure display. (The address and
-mask shown are meaningless.)
+Shows an example of the memory test failure display, so you can get an
+idea of what to expect, and gauge how readable it'll be.
 
-Should look like this Mode 7: [./mode_7_failure.png](./mode_7_failure.png)
+Should look a bit like this Mode 7:
+[./mode_7_failure.png](./mode_7_failure.png)
 
-Should look like this otherwise:
+Should look a bit like this otherwise:
 [./mode_4_failure.png](./mode_4_failure.png) (this is a bitmap Mode 4
 display, not using the teletext-style addressing mode)
+
+(The actual values shown are the year, month and day of the ROM
+version, as per the zip file name, with a `D` if running on Master
+128.)
 
 As with the real failure display, you'll have to press BREAK to get
 back to the initial state.
@@ -410,6 +417,14 @@ If the screen wraps round (e.g., displaying Mode 0 or 2 starting at
 $4000), the flashing cursor indicates where the wraparound back to
 $3000 occurred. The wraparound size is always 20 KB.
 
+## ROM build version
+
+Same as the example memory test error display, but displays the ROM
+build version, a hex string that represents the specific version of
+the code that this ROM was built from - as per the .zip file name.
+
+You'll see 6 hex digits on B/B+ and 7 hex digits on the Master.
+
 # Other testing tools
 
 OS ROM replacements for use with completely dead BBC:
@@ -465,6 +480,9 @@ The build process is supposed to be silent when there are no errors.
 The output is multiple ROM images, as described above, in folders
 inside `build`: `build/16` (16 KB ROMs), `build/32` (32 KB ROMs), and
 so on.
+
+One additional note: the ROM build date and build version (as seen by
+pressing `X` or `f1`) will be fixed values.
 
 # Licence
 

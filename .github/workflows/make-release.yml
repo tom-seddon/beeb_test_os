@@ -15,8 +15,7 @@ jobs:
           submodules: recursive
       - run: make ci_install_prerequisites
       - run: make ci_build_64tass
-      - run: make VERBOSE=1 "TASSCMD=$HOME/tass64-code/64tass"
+      - run: make ci_build_rom "TASSCMD=$HOME/tass64-code/64tass"
       - run: make ci_make_release
         env:
           GH_TOKEN: ${{ github.token }}
-          

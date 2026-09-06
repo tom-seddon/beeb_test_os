@@ -52,7 +52,7 @@ build: _folders
 .PHONY:_build
 _build: _STEM:=beeb_test_os.$(MODEL)
 _build:
-	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_$(MODEL)=true "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
+	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_$(MODEL)=true $(if $(BUILD_SUFFIX),-Dbuild_suffix="$(BUILD_SUFFIX)") "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
 
 # .PHONY:_build_master
 # _build_master: _STEM:=beeb_test_os.master$(SUFFIX)
@@ -115,6 +115,10 @@ ci_install_prerequisites:
 ci_build_64tass:
 	svn checkout -r 3120 https://svn.code.sf.net/p/tass64/code/trunk "$(HOME)/tass64-code"
 	cd "$(HOME)/tass64-code" && make -j$(nproc)
+
+.PHONY:ci_build_rom
+ci_build_rom:
+	$(MAKE) VERBOSE=1 BUILD_SUFFIX="$(shell $(SHELLCMD) git-build-suffix)"
 
 .PHONY:ci_make_release
 ci_make_release: _COMMIT:=$(shell git log -1 '--format=%H')
