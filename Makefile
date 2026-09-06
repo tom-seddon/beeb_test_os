@@ -118,10 +118,11 @@ ci_build_64tass:
 
 .PHONY:ci_make_release
 ci_make_release: _COMMIT:=$(shell git log -1 '--format=%H')
-ci_make_release: _NAME:=$(shell git log -1 '--format=%cd-%h' '--date=format:%Y%m%d-%H%M%S')
+ci_make_release: _NAME:=$(shell $(SHELLCMD) git-build-suffix)
 ci_make_release: _ZIP:=beeb_test_os.$(_NAME).zip
 ci_make_release: _README_URL:=https://github.com/tom-seddon/beeb_test_os/blob/$(_COMMIT)/README.md
 ci_make_release:
+	$(SHELLCMD) git-build-suffix --fail-when-dirty-working-copy >/dev/null
 	cd "$(BUILD)" && echo "See $(_README_URL)" > README.txt
 	cd "$(BUILD)" && zip -9r "$(_ZIP)" 16 32 64 128 README.txt
 	gh release create "$(_NAME)" --notes "$(_README_URL)"
