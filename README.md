@@ -295,20 +295,20 @@ problem address in main RAM.
 
 For B+, the 4-digit addresses relate to the CPU addresses as follows:
 
-| Addresses | Region |
-| --- | --- |
-| 0000-7fff | 32 KB main RAM |
+| Addresses | Region             |
+|-----------|--------------------|
+| 0000-7fff | 32 KB main RAM     |
 | 8000-afff | 12 KB extra B+ RAM |
-| b000-ffff | 20 KB shadow RAM |
+| b000-ffff | 20 KB shadow RAM   |
 
 For Master, the 5-digit addresses are as follows:
 
-| Addresses | Region |
-| --- | --- |
-| 00000-07fff | 32 KB main RAM |
-| 08000-08fff | 4 KB ANDY |
-| 09000-0afff | 8 KB HAZEL |
-| 0b000-0ffff | 20 KB shadow RAM |
+| Addresses   | Region                                |
+|-------------|---------------------------------------|
+| 00000-07fff | 32 KB main RAM                        |
+| 08000-08fff | 4 KB ANDY                             |
+| 09000-0afff | 8 KB HAZEL                            |
+| 0b000-0ffff | 20 KB shadow RAM                      |
 | 48000-4bfff | 16 KB sideways RAM bank 4 (if tested) |
 | 58000-5bfff | 16 KB sideways RAM bank 5 (if tested) |
 | 68000-6bfff | 16 KB sideways RAM bank 6 (if tested) |
@@ -381,7 +381,7 @@ Each set bit in the mask indicates that bit of memory should be
 ignored. The ordinary memory test uses a mask of `00`, so all bits are
 tested.
 
-You can use the mask printed by a previous test. if a memory test
+You can use the mask printed by a previous test. If a memory test
 fails, any ignored bits are treated as failing too, producing a
 combined mask that can be used for another tests that ignores the
 newly-discovered failing bit(s).
@@ -406,12 +406,12 @@ If not in mode 7, tap SPACE to adjust the screen address. (The start
 address in mode 7 is fixed.) The address is indicated by the caps
 lock/shift lock LEDs:
 
-| Caps | Shift | Base |
-| --- | --- | --- |
-| off | off | $0000 |
-| off | on | $2000 |
-| on | off | $4000 |
-| on | on | $6000 |
+| Caps | Shift | Base  |
+|------|-------|-------|
+| off  | off   | $0000 |
+| off  | on    | $2000 |
+| on   | off   | $4000 |
+| on   | on    | $6000 |
   
 If the screen wraps round (e.g., displaying Mode 0 or 2 starting at
 $4000), the flashing cursor indicates where the wraparound back to
