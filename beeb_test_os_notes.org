@@ -109,4 +109,59 @@ Second row:
 - Invalid bits, MSN
 - Invalid bits, LSN
 
+* free space
+
+** B
+
+| What  | Size | Begin | End   | Size  | Name                 |
+|-------+------+-------+-------+-------+----------------------|
+| Data: | 2826 | $c000 | $cb09 | $0b0a | memory_test          |
+| Data: | 1028 | $cb0a | $cf0d | $0404 | user_interface       |
+| Data: |  711 | $cf0e | $d1d4 | $02c7 | bits_test            |
+| Data: | 2416 | $d1d5 | $db44 | $0970 | data                 |
+| Data: | 1228 | $db45 | $e010 | $04cc | memory_test_error    |
+| Gap:  | 7151 | $e011 | $fbff | $1bef |                      |
+| Data: |  768 | $fc00 | $feff | $0300 |                      |
+| Data: |   78 | $ff00 | $ff4d | $004e | entry_points         |
+| Data: |   64 | $ff4e | $ff8d | $0040 | memory_test_patterns |
+| Gap:  |   84 | $ff8e | $ffe1 | $0054 |                      |
+| Data: |   24 | $ffe2 | $fff9 | $0018 |                      |
+| Data: |    6 | $fffa | $ffff | $0006 | vectors              |
+
+** B+
+
+| What  | Size | Begin | End   | Size  | Name                 |
+|-------+------+-------+-------+-------+----------------------|
+| Data: | 4861 | $c000 | $d2fc | $12fd | memory_test          |
+| Data: | 1028 | $d2fd | $d700 | $0404 | user_interface       |
+| Data: | 1181 | $d701 | $db9d | $049d | bits_test            |
+| Data: | 2416 | $db9e | $e50d | $0970 | data                 |
+| Data: | 1228 | $e50e | $e9d9 | $04cc | memory_test_error    |
+| Gap:  | 4646 | $e9da | $fbff | $1226 |                      |
+| Data: |  768 | $fc00 | $feff | $0300 |                      |
+| Data: |   83 | $ff00 | $ff52 | $0053 | entry_points         |
+| Data: |   64 | $ff53 | $ff92 | $0040 | memory_test_patterns |
+| Gap:  |   79 | $ff93 | $ffe1 | $004f |                      |
+| Data: |   24 | $ffe2 | $fff9 | $0018 |                      |
+| Data: |    6 | $fffa | $ffff | $0006 | vectors              |
+
+** Master
+
+| What  | Size | Begin | End   | Size  | Name                 |
+|-------+------+-------+-------+-------+----------------------|
+| Data: | 1038 | $c000 | $c40d | $040e | user_interface       |
+| Data: | 2416 | $c40e | $cd7d | $0970 | data                 |
+| Data: | 1399 | $cd7e | $d2f4 | $0577 | memory_test_error    |
+| Gap:  | 2989 | $d2f5 | $dea1 | $0bad |                      |
+| Data: | 6330 | $dea2 | $f75b | $18ba | memory_test          |
+| Data: | 1175 | $f75c | $fbf2 | $0497 | bits_test            |
+| Gap:  |   13 | $fbf3 | $fbff | $000d |                      |
+| Data: |  768 | $fc00 | $feff | $0300 |                      |
+| Data: |   91 | $ff00 | $ff5a | $005b | entry_points         |
+| Data: |   64 | $ff5b | $ff9a | $0040 | memory_test_patterns |
+| Gap:  |   71 | $ff9b | $ffe1 | $0047 |                      |
+| Data: |   24 | $ffe2 | $fff9 | $0018 |                      |
+| Data: |    6 | $fffa | $ffff | $0006 | vectors              |
+
 * eof.
+

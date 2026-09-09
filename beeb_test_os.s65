@@ -86,17 +86,16 @@ option_test_sw_banks_67=64
 
                 .elif model_master
 
+                .dsection memory_test
                 .dsection user_interface
                 .dsection data
                 .dsection memory_test_error
 
-                ; For Master, memory test wants to go last, as it has
-                ; to be out of the way of HAZEL.
-                .if *<$e000-(memory_test.page_in_hazel-memory_test)
-*=$e000-(memory_test.page_in_hazel-memory_test)
-                .endif
-                .dsection memory_test
+                *=$fc00-(hazel_access_end-hazel_access_begin)
+hazel_access_begin:
+                .dsection master_hazel_test
                 .dsection bits_test
+hazel_access_end:
                 
                 .endif
                 
@@ -958,13 +957,6 @@ test:
                 ldx #0+7        ; shift lock on
                 stx system_via.orb
 
-                .if model_master
-page_in_hazel:
-                ; page in HAZEL
-                .cerror *>=$c000&&*<$e000
-                lda #acccon.y
-                tsb acccon
-                .endif
 
 test_loop:
                 
@@ -1010,11 +1002,29 @@ test_upper:
 
                 .if model_bplus||model_master
                 
-                ; fill ANDY
+                ; fill ANDY (B+/Master)
                 lda patterns,x
-                .for _i=$80,_i<$b0,_i+=1
+                .for _i=$80,_i<$90,_i+=1
                 .test_fill_iteration _i
                 .endfor
+
+                .if model_bplus
+
+                ; fill remainder of ANDY (B+)
+                lda patterns,x
+                .for _i=$90,_i<$b0,_i+=1
+                .test_fill_iteration _i
+                .endfor
+
+                .elif model_master
+
+                ; put the HAZEL testing bit out of the way
+                jmp master_hazel_fill
+master_hazel_fill_done:
+
+                .else
+                .error
+                .endif
 
                 ; fill shadow
                 .activate_shadow
@@ -1098,10 +1108,22 @@ check_upper:
 
                 .if model_bplus||model_master
 
-                ; check ANDY
-                .for _i=$80,_i<$b0,_i+=1
+                ; check ANDY (B+/Master)
+                .for _i=$80,_i<$90,_i+=1
                 .test_check_iteration _i
                 .endfor
+
+                .if model_bplus
+                ; check remainder of ANDY
+                .for _i=$90,_i<$b0,_i+=1
+                .test_check_iteration _i
+                .endfor
+                .elif model_master
+                jmp master_hazel_test
+master_hazel_test_done:
+                .else
+                .error
+                .endif
 
                 ; check shadow
                 .activate_shadow
@@ -1157,6 +1179,52 @@ check_next:
 
                 .endsection
 
+;-------------------------------------------------------------------------
+; 
+; Bits of memory test code that access HAZEL. They get their own
+; section so it's easy to keep it out of the way.
+;
+; (The bits test also accesses HAZEL, but it is, for now, small enough
+; that it's not a problem.)
+                
+                .if model_master
+                .section master_hazel_test
+
+master_hazel_fill:
+                ; page in HAZEL
+                .cerror *>=$c000&&*<$e000
+                lda #acccon.y
+                tsb acccon
+
+                lda patterns,x
+                .for _i=$90,_i<$b0,_i+=1
+                .test_fill_iteration _i
+                .endfor
+
+                ; page out HAZEL
+                lda #acccon.y
+                trb acccon
+
+                jmp memory_test.master_hazel_fill_done
+
+master_hazel_test:
+                .cerror *>=$c000&&*<$e000
+                lda #acccon.y
+                tsb acccon
+
+                .for _i=$90,_i<$b0,_i+=1
+                .test_check_iteration _i
+                .endfor
+                
+                ; page out HAZEL
+                lda #acccon.y
+                trb acccon
+
+                jmp memory_test.master_hazel_test_done
+                
+                .endsection
+                .endif
+                
 ;-------------------------------------------------------------------------
 
                 .section memory_test_error
