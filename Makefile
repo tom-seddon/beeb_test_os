@@ -76,7 +76,7 @@ clean:
 ##########################################################################
 ##########################################################################
 
-# The tom_ targets run on my laptop.
+# The tom_ targets run on my computer.
 
 .PHONY:tom_laptop
 tom_laptop: _CURL:=curl --no-progress-meter --fail-with-body
@@ -89,7 +89,8 @@ tom_laptop:
 #	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B (Test OS)"
 
 	$(_V)$(_CURL) "$(_URL)/api-set-globals/b2" --data-urlencode "read_path=$(shell $(SHELLCMD) realpath .)"
-	$(_V)$(_CURLAPI) --data-binary "@etc/b2/b.json"
+#	$(_V)$(_CURLAPI) --data-binary "@etc/b2/b.json"
+	$(_V)$(_CURLAPI) --data-binary "@etc/b2/bplus.json"
 #	$(_V)$(_CURLAPI) --data-binary "@etc/b2/m128.json"
 
 ##########################################################################
