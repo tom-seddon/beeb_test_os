@@ -63,7 +63,8 @@ https://www.stardot.org.uk/forums/viewtopic.php?t=30389)
 # How to use the test OS
 
 The system will need a functioning keyboard and system VIA and you'll
-need a display.
+need a display. Please unplug peripherals: floppy disk drive, 1 MHz
+bus peripherals, second processor, and so on.
 
 Program the test OS into a ROM as above, plug the ROM into the
 appropriate socket, and power on the system. The expected result is a
@@ -88,8 +89,15 @@ finds a problem, with no time limit - so if it's still running after
 you've left it overnight, there's no obvious problem with the RAM at
 least.
 
-If a discrepancy is found, you'll see a display with two hex numbers:
-a 4- or 5-digit one, and a 2-digit one.
+If an error occurs, you'll see a display with three rows of text: 1
+character indicating the error type, then a 2-digit hex number, then a
+4-digit hex number.
+
+If the error type is `!`, something surprising happened - see the
+section on non-memory problems below.
+
+Otherwise, it indicates a memory error. Next steps depend on type of
+system: B, B+/B+128, Master 128, or Master Compact/Olivetti PC 128 S.
 
 ## B
 
@@ -123,17 +131,17 @@ further errors. So next thing to do is a memory test with options -
 press BREAK to get back to the initial state, then do `O`, then follow
 [the memory test with options instructions
 below](#main-memory-test-with-options), selecting `Y` for the memory
-refresh mode, and using the 2-digit value from the failure screen for
-the ignore mask.
+refresh mode, and using the 2-digit value from the initial failure
+screen for the ignore mask.
 
 (The memory region option doesn't apply to the B+.)
 
 If you get an error from this, repeat the process, but this time, for
-the ignore mask, use the 2-digit value displayed on the failure
-screen. Keep going until you get a successful run or until the ignore
-mask would be `FF`. Note the final ignore mask either way, and read it
-off from the [B+ table](./docs/table.bplus.md) to figure out the
-likely problem ICs.
+the ignore mask, use the 2-digit value displayed on the previous
+failure screen. Keep going until you get a successful run or until the
+ignore mask would be `FF`. Note the final ignore mask either way, and
+read it off from the [B+ table](./docs/table.bplus.md) to figure out
+the likely problem ICs.
 
 ## Master 128
 
@@ -192,6 +200,19 @@ the [Master Compact table for the S
 region](./docs/table.master_compact.S.md) to find the likely problem
 ICs.
 
+# Non-memory problems
+
+If you get an error screen with a `!`, something surprising happened
+that isn't related to the memory test.
+
+The second row of text, a hex number, indicates the cause, one of the
+following values:
+
+- `01` - NMI occurred. Check for noisy NMI input to the CPU. Consider
+  removing floppy disk controller and/or Econet hardware
+
+----
+
 # Reference manual
 
 You'll need a functioning keyboard and system VIA. The system ideally
@@ -232,12 +253,15 @@ You can tap the following keys:
 
 - `X` - memory test failure example display
 
-- `f1` - ROM build version
+- `f1` - ROM build date
+
+- `f1` (with `SHIFT` held) - ROM build commit
 
 ## Memory test failure example display
 
-Shows an example of the memory test failure display, so you can get an
-idea of what to expect, and gauge how readable it'll be.
+Shows an example of the memory test failure display, showing the
+numbers `0` to `6` inclusive, so you can get an idea of what to
+expect, and gauge how readable it'll be.
 
 Should look a bit like this Mode 7:
 [./mode_7_failure.png](./mode_7_failure.png)
@@ -245,10 +269,6 @@ Should look a bit like this Mode 7:
 Should look a bit like this otherwise:
 [./mode_4_failure.png](./mode_4_failure.png) (this is a bitmap Mode 4
 display, not using the teletext-style addressing mode)
-
-(The actual values shown are the year, month and day of the ROM
-version, as per the zip file name, with a `D` if running on Master
-128.)
 
 As with the real failure display, you'll have to press BREAK to get
 back to the initial state.
@@ -280,20 +300,30 @@ The test runs indefinitely, and if there's an error it will switch the
 LEDs off and display a report. The report uses mode 7 if testing in
 mode 7, or mode 4 if testing in another mode.
 
-The error report consists of two rows of large text. The first row
-shows the problem address (4 or 5 hex digits - see below), and the
-second row is a mask indicating which bits were found to be incorrect
-(2 hex digits).
+The error report consists of three rows of large text.
 
-The report is intended to be somewhat readable even if there are stuck
-bits or noise, but no guarantees.
+The first row, 1 character, indicates the error type. If `!`,
+something unexpected happened (see section above). Otherwise, it will
+be a hex digit, indicating 
 
-### Memory test addresses
+Row 2 is a mask indicating the faulty bits.
 
-Addresses shown on BBC B will be 4 digits, 0000-7fff, indicating the
-problem address in main RAM.
+Row 3 represents the problem address, which isn't always relevant, but
+can sometimes prove useful. (Use the tables below to figure out which
+memory region the address corresponds to.)
 
-For B+, the 4-digit addresses relate to the CPU addresses as follows:
+### BBC B memory test failure
+
+The error type will be `0`.
+
+The 3rd row shows the problem address in main RAM.
+
+### BBC B+ memory test failure
+
+The error type will be `0`.
+
+Problem addresses shown on a B+ are 4 digits, and relate to the CPU
+addresses as follows:
 
 | Addresses | Region             |
 |-----------|--------------------|
@@ -301,18 +331,20 @@ For B+, the 4-digit addresses relate to the CPU addresses as follows:
 | 8000-afff | 12 KB extra B+ RAM |
 | b000-ffff | 20 KB shadow RAM   |
 
-For Master, the 5-digit addresses are as follows:
+### Master error report
 
-| Addresses   | Region                                |
-|-------------|---------------------------------------|
-| 00000-07fff | 32 KB main RAM                        |
-| 08000-08fff | 4 KB ANDY                             |
-| 09000-0afff | 8 KB HAZEL                            |
-| 0b000-0ffff | 20 KB shadow RAM                      |
-| 48000-4bfff | 16 KB sideways RAM bank 4 (if tested) |
-| 58000-5bfff | 16 KB sideways RAM bank 5 (if tested) |
-| 68000-6bfff | 16 KB sideways RAM bank 6 (if tested) |
-| 78000-7bfff | 16 KB sideways RAM bank 7 (if tested) |
+For Master, the error type and addresses are both relevant:
+
+| Error | Addresses  | Region                                |
+|-------|------------|---------------------------------------|
+| 0     | 0000-07fff | 32 KB main RAM                        |
+| 0     | 8000-08fff | 4 KB ANDY                             |
+| 0     | 9000-0afff | 8 KB HAZEL                            |
+| 0     | b000-0ffff | 20 KB shadow RAM                      |
+| 4     | 8000-4bfff | 16 KB sideways RAM bank 4 (if tested) |
+| 5     | 8000-5bfff | 16 KB sideways RAM bank 5 (if tested) |
+| 6     | 8000-6bfff | 16 KB sideways RAM bank 6 (if tested) |
+| 7     | 8000-7bfff | 16 KB sideways RAM bank 7 (if tested) |
 
 ## Main memory test with options
 
@@ -417,13 +449,26 @@ If the screen wraps round (e.g., displaying Mode 0 or 2 starting at
 $4000), the flashing cursor indicates where the wraparound back to
 $3000 occurred. The wraparound size is always 20 KB.
 
+## ROM build date
+
+Same as the example memory test error display, but displays the ROM
+build date in rows 2 and 3, a 6-digit hex string that represents the
+date of the code that this ROM was built from - as per the .zip file
+name.
+
+Row 2 shows the year, and row 3 shows the month then the day - all 2
+digits.
+
+Row 1 will be `#`.
+
 ## ROM build version
 
 Same as the example memory test error display, but displays the ROM
-build version, a hex string that represents the specific version of
-the code that this ROM was built from - as per the .zip file name.
+build version in rows 2 and 3, a 6-digit hex string that represents
+the specific version of the code that this ROM was built from - as per
+the .zip file name.
 
-You'll see 6 hex digits on B/B+ and 7 hex digits on the Master.
+Row 1 will be `#`.
 
 # Other testing tools
 

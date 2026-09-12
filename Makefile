@@ -52,7 +52,7 @@ build: _folders
 .PHONY:_build
 _build: _STEM:=beeb_test_os.$(MODEL)
 _build:
-	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_$(MODEL)=true $(if $(BUILD_SUFFIX),-Dbuild_suffix="$(BUILD_SUFFIX)") "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
+	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_$(MODEL)=true $(if $(BUILD_SUFFIX),-Dbuild_suffix="$(BUILD_SUFFIX)") $(if $(ENABLE_TEST_HARDWARE),-Denable_test_hardware=true) "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
 
 # .PHONY:_build_master
 # _build_master: _STEM:=beeb_test_os.master$(SUFFIX)
@@ -83,7 +83,7 @@ tom_laptop: _CURL:=curl --no-progress-meter --fail-with-body
 tom_laptop: _URL:=http://localhost:48075
 tom_laptop: _CURLAPI:=$(_CURL) "$(_URL)/api" -H "Content-Type: application/json"
 tom_laptop:
-	$(_V)$(MAKE) build
+	$(_V)$(MAKE) build # ENABLE_TEST_HARDWARE=1
 #	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B+128 (Test OS)"
 #	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=Master 128 (Test OS)"
 #	$(_V)$(_CURL) --connect-timeout 0.25 -G "http://localhost:48075/reset/b2" --data-urlencode "config=B (Test OS)"

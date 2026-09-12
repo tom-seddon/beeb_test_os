@@ -163,5 +163,63 @@ Second row:
 | Data: |   24 | $ffe2 | $fff9 | $0018 |                      |
 | Data: |    6 | $fffa | $ffff | $0006 | vectors              |
 
+* System VIA stuff
+
+** Stuff
+
+CA1 = vsync
+CA2 = keyboard
+CB1 = ADC end of conversion
+CB2 = light pen strobe
+
+** Registers used to hold state
+
+*** T1L-L, T1L-H
+
+Used for storing various bits of state.
+
+*** ACR
+
+- the one with the T1/T2/SR/latching controls
+- PA latching control (bit 0) is relevant for reading the keyboard
+
+Holds memory pattern index during the memory test.
+
+*** IFR
+
+If T1 IRQ (bit 6) is enabled, the ROM is definitely in the hardware
+test state and RAM can be assumed to be working.
+
+(If T1 IRQ is disabled, the ROM state is indeterminate. Assume RAM not
+working.)
+
+* Error screen "API" spring clean
+
+Memory screen layout:
+
+: T
+: AA
+: XXYY
+
+** Memory test error
+
+Do a =jmp memory_error=.
+
+=T= will be =0= (B/B+), or the LSN of ROMSEL (Master).
+
+=AA= will be EOR'd with NOT(System VIA T1L-H) before being printed.
+
+** Other error
+
+Do a =jmp other_error=.
+
+=T= will be =!=.
+
+** Info "error"
+
+Do a =jmp info_error=
+
+=T= will be =#=.
+
 * eof.
 

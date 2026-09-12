@@ -1,0 +1,517 @@
+                .cerror !enable_test_hardware
+                
+; The test hardware code gets its own file, as it's somewhat
+; different. The policy is that it can assume that RAM is working, so
+; it can be written in a more typical style.
+
+;-------------------------------------------------------------------------
+
+SCREEN_WIDTH=40
+SCREEN_HEIGHT=25
+                
+;-------------------------------------------------------------------------
+
+                .section test_hardware_zp
+; for me, when debugging in the emulator...
+debug_state: .fill 1
+
+; bit 7 set if teletext mode
+is_teletext: .fill 1
+
+; general-purpose screen memory address
+screen_addr: .fill 2
+
+; general-purpose string address
+string_addr: .fill 2
+
+; font data address
+font_addr: .fill 2
+
+; current character X/Y position for char print
+char_x: .fill 1
+char_y: .fill 1
+
+; VIA IRQ type counters
+num_system_via_t1s: .fill 1
+num_user_via_t1s: .fill 1
+num_system_via_t2s: .fill 1
+num_user_via_t2s: .fill 1
+num_system_via_ca1s: .fill 1
+
+; keyboard test screen workspace          
+key_number: .fill 1
+key_char_x: .fill 1
+                .endsection
+
+;-------------------------------------------------------------------------
+
+                .section test_hardware
+
+x40:=[]
+                .for _i=0,_i<25,_i+=1
+x40..=[_i*40]
+                .endfor
+
+x40_lsb: .byte <x40
+x40_msb: .byte >x40
+
+; mode_4_row_addrs:=[]
+;                 .for _i=0,_i<32,_i+=1
+; mode_4_row_addrs..=[$5800+_i*320]
+;                 .endfor
+
+; mode_4_row_addrs_lsb: .byte <mode_4_row_addrs
+; mode_4_row_addrs_msb: .byte >mode_4_row_addrs
+
+font:
+                .binary "font.dat"
+
+;-------------------------------------------------------------------------
+
+; preserves X/Y
+reset_screen_addr: .proc
+                lda #0
+                sta char_x
+                sta char_y
+                sec
+                ror screen_addr+1
+                rts
+                .endproc
+
+home:
+                lda #0
+                sta char_x
+                sta char_y
+                rts
+                
+;-------------------------------------------------------------------------
+
+; preserves X
+clear_screen: .proc
+                jsr home
+
+loop:
+                lda #' '
+                jsr print_char
+
+                lda char_x
+                ora char_y
+                bne loop
+
+                jmp home
+                .endproc
+
+;-------------------------------------------------------------------------
+
+print_hex: .proc
+                pha
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                jsr hex2
+                pla
+                and #$0f
+hex2:
+                sed
+                cmp #10
+                adc #$30
+                cld
+                jmp print_char
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+print_char: .proc
+                pha
+                txa
+                pha
+                tya
+                pha
+
+                ; compute screen address
+                clc
+                ldy char_y
+                lda char_x
+                adc x40_lsb,y
+                sta screen_addr+0
+                lda #0
+                adc x40_msb,y
+
+                bit is_teletext
+                bpl get_bitmap_address
+
+get_teletext_address:
+                clc
+                adc #$7c
+                jmp got_address_msb
+
+get_bitmap_address:
+                asl screen_addr+0
+                rol a
+                asl screen_addr+0
+                rol a
+                asl screen_addr+0
+                rol a
+                clc
+                adc #$58
+got_address_msb:
+                sta screen_addr+1
+
+                tsx
+                lda $103,x      ; old A
+                
+                cmp #13
+                beq cr
+
+                bit is_teletext
+                bpl bitmap
+
+                cmp #$23
+                beq print_teletext_hash_char
+                cmp #$5f
+                beq print_teletext_underscore_char
+                cmp #$60
+                beq print_teletext_gbp_char
+
+got_teletext_char:
+                ldy #0
+                sta (screen_addr),y
+
+                jsr next_pos
+done:
+                ; update cursor pos
+                ldx #15         ; R15=CRTC cursor LSB
+                ldy char_y
+                lda char_x
+                clc
+                adc x40_lsb,y
+                jsr set_crtc
+
+                dex             ; R14=CRTC cursor MSB
+                lda x40_msb,y
+                bit is_teletext
+                bpl +
+                adc #$28        ; fix up for teletext
+                jmp update_cursor
++
+                adc #$58>>3     ; fix up for mode 4
+update_cursor:
+                jsr set_crtc
+                
+                pla
+                tay
+                pla
+                tax
+                pla
+                rts
+
+cr:
+                lda #0
+                sta char_x
+                jsr next_char_y
+                jmp done
+                
+next_char_y:
+                inc char_y
+                lda char_y
+                cmp #SCREEN_HEIGHT
+                bcc +
+                lda #0
+                sta char_y
++
+                rts
+                
+print_teletext_gbp_char:
+                eor #$3f
+print_teletext_hash_char:
+                eor #$43
+print_teletext_underscore_char:
+                eor #$3f
+                jmp got_teletext_char
+
+bitmap:
+                asl a           ; *2
+                asl a           ; *4
+                rol font_addr+1
+                asl a           ; *8
+                rol font_addr+1
+                clc
+                adc #<(font-32*8)
+                sta font_addr+0
+                lda font_addr+1
+                and #3
+                adc #>(font-32*8)
+                sta font_addr+1
+                
+                ldy #7
+loop:
+                lda (font_addr),y
+                sta (screen_addr),y
+                dey
+                bpl loop
+
+                jsr next_pos
+                jmp done
+
+next_pos:
+                inc char_x
+                lda char_x
+                cmp #SCREEN_WIDTH
+                bcc +
+                lda #0
+                sta char_x
+                jsr next_char_y
++
+                rts
+
+                .endproc
+
+;-------------------------------------------------------------------------
+
+print_following_string: .proc
+chars_loop:
+                pla
+                clc
+                adc #1
+                sta string_addr+0
+                tay
+
+                pla
+                adc #0
+                sta string_addr+1
+                pha
+
+                tya
+                pha
+
+                ldy #0
+                lda (string_addr),y
+                beq done
+
+                jsr print_char
+
+                jmp chars_loop
+
+done:
+                rts
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+cursor_off:
+                lda #%00100000
+                ldx #10
+; preserves A/X/Y/C
+set_crtc:
+                stx $fe00
+                sta $fe01
+                rts
+                
+;-------------------------------------------------------------------------
+
+test_hardware: .proc
+                ldx #$ff
+                txs
+                
+                lda #1
+                sta debug_state
+                jsr init
+                lda #2
+                sta debug_state
+                jsr clear_screen
+                lda #3
+                sta debug_state
+
+                jsr print_following_string
+                .text 'HARDWARE TESTS',13
+                .text '==============',13
+                .text 13
+                .text 'V. Vsync',13
+                .text 'S. System VIA timers',13
+                .text 'U. User VIA timers',13
+                .text 'B. Both VIA timers',13
+                .text 'K. Keyboard',13
+                .text 'S. Sound',13
+                .if enable_induce_nmi
+                .text 'N. Induce NMI (see documentation)',13
+                .endif
+                .text 0
+
+input_loop:
+                jsr read_key
+                cpx #key_k
+                beq test_keyboard
+                jmp input_loop
+
+read_key: .proc
+;                 ldx #int(\key)
+;                 stx system_via.ora_no_handshake
+;                 bit system_via.ora_no_handshake
+                ldx #$10
+loop:
+                stx system_via.ora_no_handshake
+                bit system_via.ora_no_handshake
+                bpl next
+debounce:
+                bit system_via.ora_no_handshake
+                bmi debounce
+                rts
+next:
+                inx
+                bpl loop
+                ldx #$ff        ; invalid key
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+test_keyboard: .proc
+                jsr clear_screen
+                jsr cursor_off
+
+                jsr key_iter_reset
+init_loop:
+                lda key_char_x
+                sta char_x 
+                
+                lda key_number
+                jsr print_hex
+
+                jsr key_iter_next
+
+                bit key_number
+                bpl init_loop
+
+test_loop:
+                jsr key_iter_reset
+test_loop_1:
+                lda key_char_x
+                clc
+                adc #2
+                sta char_x
+
+                lda #' '
+
+                ldx key_number
+                stx system_via.ora_no_handshake
+                bit system_via.ora_no_handshake
+                bpl +
+                lda #'*'
++
+                jsr print_char
+
+                jsr key_iter_next
+
+                bit key_number
+                bpl test_loop_1
+                jmp test_loop
+
+                jmp hang
+
+key_iter_reset:
+                lda #0
+                sta char_y
+                sta key_number
+                sta key_char_x
+                rts
+
+key_iter_next:
+                inc char_y
+                lda char_y
+                cmp #SCREEN_HEIGHT
+                bcc +
+                lda #0
+                sta char_y
+                clc
+                lda key_char_x
+                adc #5
+                sta key_char_x
++
+                inc key_number
+                rts
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+init: .proc
+                ldx #8+6        ; caps lock off
+                stx system_via.orb
+                ldx #8+7        ; shift lock off
+                stx system_via.orb
+
+                lda #12
+                sta $fe00
+                lda $fe01
+                cmp #$20
+                ror is_teletext
+
+                ;
+                bit is_teletext
+                bmi init_teletext
+init_bitmap:
+                ldx #15
+-
+                lda palette_mono,x
+                sta video_ula_palette
+                dex
+                bpl -
+                
+                ldx #crtc_10KB_5800-crtc_tables
+                
+                lda #mode_4_ula_control
+                jmp init_video
+
+init_teletext:
+                ldx #crtc_teletext-crtc_tables
+                lda #teletext_ula_control
+init_video:
+                sta video_ula_control
+
+                ldy #0
+set_crtc_loop:
+                sty $fe00
+                lda crtc_tables,x
+                sta $fe01
+                inx
+                iny
+                cpy #16
+                bne set_crtc_loop
+
+                jsr clear_screen
+
+                rts
+
+                .endproc
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+handle_irq: .macro via,flag,counter
+                lda #int(\flag)
+                bit (\via).ifr
+                beq +
+                sta (\via).ifr
+                inc \counter
++
+                .endmacro
+
+test_hardware_handle_irq:
+                pha
+
+                .handle_irq system_via,VIAIRQ.t1,num_system_via_t1s
+                .handle_irq system_via,VIAIRQ.t2,num_system_via_t2s
+                .handle_irq user_via,VIAIRQ.t1,num_user_via_t1s
+                .handle_irq user_via,VIAIRQ.t2,num_user_via_t2s
+                .handle_irq system_via,VIAIRQ.ca1,num_system_via_ca1s
+                
+                pla
+                rti
+
+;-------------------------------------------------------------------------
+
+                .endsection test_hardware
+                

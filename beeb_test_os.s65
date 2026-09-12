@@ -12,6 +12,10 @@ model_master=false
 ;             yyyymmdd-hhmmss-hash
 build_suffix="20240502-220819-4b280000"
 ; (the above is the first commit for this repo)
+
+enable_test_hardware=false
+enable_induce_nmi=true
+                
                 .endweak
 
                 .if (model_b?1:0)+(model_bplus?1:0)+(model_master?1:0)!=1
@@ -56,6 +60,12 @@ commit=xtoi(build_suffix,16)<<24|xtoi(build_suffix,18)<<16|xtoi(build_suffix,20)
                 
 ;-------------------------------------------------------------------------
 
+mode_0_ula_control=$9c
+mode_4_ula_control=$88
+teletext_ula_control=$4a
+                
+;-------------------------------------------------------------------------
+
 option_test_refresh=1
 option_test_refresh_long_delay=2
                 
@@ -67,7 +77,14 @@ option_test_main_ram=16
 option_test_sw_banks_45=32
 option_test_sw_banks_67=64
                 .endif
-                
+
+;-------------------------------------------------------------------------
+
+*=0
+                .if enable_test_hardware
+                .dsection test_hardware_zp
+                .endif
+
 ;-------------------------------------------------------------------------
 
 *=$c000
@@ -83,6 +100,9 @@ option_test_sw_banks_67=64
                 .dsection data
                 ;.dsection memory_test_patterns
                 .dsection memory_test_error
+                .if enable_test_hardware
+                .dsection test_hardware
+                .endif
 
                 .elif model_master
 
@@ -90,6 +110,9 @@ option_test_sw_banks_67=64
                 .dsection user_interface
                 .dsection data
                 .dsection memory_test_error
+                .if enable_test_hardware
+                .dsection test_hardware
+                .endif
 
                 *=$fc00-(hazel_access_end-hazel_access_begin)
 hazel_access_begin:
@@ -197,10 +220,15 @@ copy_message: .macro addr,text
 ;-------------------------------------------------------------------------
 
 ; Preserves A/Y/C
-handle_key: .macro key,routine
-                ldx #\key
+test_key: .macro key
+                ldx #int(\key)
                 stx system_via.ora_no_handshake
                 bit system_via.ora_no_handshake
+                .endmacro                
+                
+; Preserves A/Y/C
+handle_key: .macro key,routine
+                .test_key \key
                 bpl not_pressed
 wait_for_up_loop:
                 bit system_via.ora_no_handshake
@@ -237,10 +265,10 @@ loop:
                 bne +
 
                 ; Better to use $20 than $00, as if bits other than
-                ; bit 5 are stuck ; high then you won't get any
-                ; control chars that could muck things up. (If bit 5
-                ; is stuck low, best hope other bits aren't stuck
-                ; high! Or try a bitmap mode...)
+                ; bit 5 are stuck high then you won't get any control
+                ; chars that could muck things up. (If bit 5 is stuck
+                ; low, best hope other bits aren't stuck high! Or try
+                ; a bitmap mode...)
                 lda #$20
 +
                 sta $7c00+((\yc)*8+_y)*40+(\xc)*8,y
@@ -294,36 +322,56 @@ _done:
 ;-------------------------------------------------------------------------
 
 error_screen: .macro mode
-                
-                ; Problem address
-addr_x:=0
+
+                ; Error type
+
+                bvs memory_error_type
+
+                lda #16*8       ; assume !
+                bcs +           ; taken if !
+                lda #17*8       ; actually #
++
+                jmp draw_type_glyph
+
+memory_error_type:
                 .if model_master
                 lda romsel
-                and #$0f
-                .draw_lsn_glyph \mode,addr_x,0
-addr_x:=addr_x+1
+                and #$0f        ; 4/5/6/7=Master ROM bank
+                .else
+                lda #0          ; 0=ordinary memory test failure
                 .endif
+
+                asl a
+                asl a
+                asl a
+
+draw_type_glyph:
+                .draw_glyph \mode,0,0
+
+addr_x:=0
                 tsx
                 txa
-                .draw_msn_glyph \mode,addr_x,0
+                .draw_msn_glyph \mode,addr_x,2
 addr_x:=addr_x+1
                 tsx
                 txa
-                .draw_lsn_glyph \mode,addr_x,0
+                .draw_lsn_glyph \mode,addr_x,2
 addr_x:=addr_x+1
                 lda system_via.t1l_h
-                .draw_msn_glyph \mode,addr_x,0
+                .draw_msn_glyph \mode,addr_x,2
 addr_x:=addr_x+1
                 lda system_via.t1l_h
-                .draw_lsn_glyph \mode,addr_x,0
+                .draw_lsn_glyph \mode,addr_x,2
 addr_x:=addr_x+1
 
                 ; Problem bits
                 lda system_via.t1l_l
                 .draw_msn_glyph \mode,0,1
+                
                 lda system_via.t1l_l
                 .draw_lsn_glyph \mode,1,1
 
+done:
                 jmp hang
                 
                 .endmacro
@@ -343,9 +391,9 @@ activate_shadow: .macro
                 .endif
                 .endmacro
 
+; Preserves X/Y/C
 deactivate_shadow: .macro
                 .if model_bplus
-; Preserves X/Y/C
                 lda #$00
                 sta acccon
                 .elif model_master
@@ -367,6 +415,10 @@ reset:
 
                 ; disable shadow RAM on B+
                 sta $fe34       ; select main RAM (if B+ or later)
+
+                ; disable system VIA IRQs
+                lda #$7f
+                sta system_via.ier
                 
                 ; check if initialisation was (probably) run on a
                 ; previous boot
@@ -472,6 +524,9 @@ main_menu_loop:
                 .handle_key key_e,teletext_engineering_test
                 .handle_key key_x,example_error
                 .handle_key key_f1,show_version
+                .if enable_test_hardware
+                .handle_key key_h,test_hardware_thunk
+                .endif
 
                 ; delay ~3,000 cycles
                 ldx #0
@@ -496,12 +551,21 @@ delay_loop:
                 
                 jmp main_menu_loop
 
+                .if enable_test_hardware
+test_hardware_thunk:
+                .test_key key_shift
+                bpl main_menu_loop
+                .test_key key_ctrl
+                bpl main_menu_loop
+                jmp test_hardware
+                .endif
+                
 set_mode_0:
-                .set_mode crtc_20KB,palette_mono,$9c
+                .set_mode crtc_20KB,palette_mono,mode_0_ula_control
                 jmp main_menu_loop
 
 set_mode_4:
-                .set_mode crtc_10KB,palette_mono,$88
+                .set_mode crtc_10KB,palette_mono,mode_4_ula_control
                 jmp main_menu_loop
 
 teletext_engineering_test:
@@ -517,7 +581,7 @@ teletext_engineering_test:
                 .cerror *!=set_mode_7 ; fall through
 
 set_mode_7:
-                .set_mode crtc_teletext,-1,$4a
+                .set_mode crtc_teletext,-1,teletext_ula_control
                 jmp main_menu_loop
 
 mode_2_test_card:
@@ -552,41 +616,37 @@ mode_8_test_card:
 
 example_error:
                 .if model_master
-                lda #$d
+                lda #0
                 sta romsel
                 .endif
 
                 lda #$ff
                 sta system_via.t1l_h
 
-                ldx #build_yy
-                ldy #build_mm
-                lda #build_dd
+                lda #$12
+                ldx #$34
+                ldy #$56
                 
-                jmp error
+                jmp memory_error
 
 show_version:
                 lda #$ff
                 sta system_via.t1l_h
-                
-                .if model_master
 
-                lda #(commit>>28)&$f
-                sta romsel
+                .test_key key_shift
 
-                ldx #(commit>>20)&$ff
-                ldy #(commit>>12)&$ff
-                lda #(commit>>4)&$ff
+                bpl show_date
+show_commit:
+                lda #(commit>>24)&$ff
+                ldx #(commit>>16)&$ff
+                ldy #(commit>>8)&$ff
+                jmp info_error
 
-                .else
-
-                ldx #(commit>>24)&$ff
-                ldy #(commit>>16)&$ff
-                lda #(commit>>8)&$ff
-
-                .endif
-
-                jmp error
+show_date:
+                lda #build_yy
+                ldx #build_mm
+                ldy #build_dd
+                jmp info_error                
 
                 .endsection
 
@@ -652,22 +712,22 @@ test_loop:
                 sta acccon
                 .endif
                 
-                handle_key key_space,toggle_address
+                .handle_key key_space,toggle_address
                 lda system_via.t1l_h
-                handle_key key_0,toggle_0
-                handle_key key_1,toggle_1
-                handle_key key_2,toggle_2
-                handle_key key_3,toggle_3
-                handle_key key_4,toggle_4
-                handle_key key_5,toggle_5
-                handle_key key_6,toggle_6
-                handle_key key_7,toggle_7
-                handle_key key_8,fill_00
-                handle_key key_9,fill_ff
-                handle_key key_f,fill
+                .handle_key key_0,toggle_0
+                .handle_key key_1,toggle_1
+                .handle_key key_2,toggle_2
+                .handle_key key_3,toggle_3
+                .handle_key key_4,toggle_4
+                .handle_key key_5,toggle_5
+                .handle_key key_6,toggle_6
+                .handle_key key_7,toggle_7
+                .handle_key key_8,fill_00
+                .handle_key key_9,fill_ff
+                .handle_key key_f,fill
                 .if model_bplus||model_master
-                handle_key key_m,display_main
-                handle_key key_s,display_shadow
+                .handle_key key_m,display_main
+                .handle_key key_s,display_shadow
                 .endif
                 jmp test_loop
 
@@ -778,7 +838,7 @@ test_check_iteration: .segment page
                 beq +
 
                 ldx #(\page)&$ff
-                jmp error
+                jmp memory_error
 +
                 .endsegment
 
@@ -1228,7 +1288,10 @@ master_hazel_test:
 ;-------------------------------------------------------------------------
 
                 .section memory_test_error
+
 error_2: .proc
+                ; must preserve C
+                
                 ldx #8+6
                 stx system_via.orb
                 ldx #8+7
@@ -1277,6 +1340,10 @@ cls_mode_7_loop:
                 .endproc
                 
 hang:
+                clc
+                adc #1
+                inx
+                iny
                 jmp hang
 
                 .endsection
@@ -1352,6 +1419,8 @@ xdigit_keys:
 
 ;-------------------------------------------------------------------------
 
+crtc_tables:
+                
 crtc_teletext: .block
                 .byte  $3F  ; 0 Horizontal Total     =64
                 .byte  $28  ; 1 Horizontal Displayed =40
@@ -1409,6 +1478,27 @@ crtc_10KB: .block ;MODEs 4/5
 
 ;-------------------------------------------------------------------------
 
+; specific case for the hardware test - no more bytes to have a
+; separate table than to fix up the start/cursor address in code
+crtc_10KB_5800: .block ;MODEs 4/5
+                .byte $3f                 ;R0 - Horizontal Total
+                .byte $28                 ;R1 - Horizontal Displayed
+                .byte $31                 ;R2 - Horizontal Sync
+                .byte $24                 ;R3 - Sync Width (%vvvvhhhh)
+                .byte $26                 ;R4 - Vertical Total
+                .byte $00                 ;R5 - Vertical Total Adjust
+                .byte $20                 ;R6 - Vertical Displayed
+                .byte $22                 ;R7 - Vertical Sync Position
+                .byte 1;CRTC.R8.cursorDelay0|CRTC.R8.displayDelay0|CRTC.R8.interlaceSync ;R8 - Interlace/Delay
+                .byte $07               ;R9 - Scan lines per character
+                .byte $67;CRTC.R10.blink|CRTC.R10.slowBlink|7 ;R10 - Cursor blink/start
+                .byte 8  ;R11 - Cursor End
+                .byte $0b,$00 ; R12,R13 - start address
+                .byte $0b,$00 ; R14,R15 - cursor position
+                .endblock
+
+;-------------------------------------------------------------------------
+
 palette_mono:
                 .for _i=0,_i<16,_i+=1
                 .byte _i<<4|(_i<8?7:0)
@@ -1431,7 +1521,7 @@ engtest:
                 .include "build/glyphs_data.generated.s65"
 
                 .endsection
-                
+
 ;-------------------------------------------------------------------------
 
                 .section entry_points
@@ -1465,13 +1555,22 @@ delay_done:
                 
 ;-------------------------------------------------------------------------
 
+other_error:
+                clv
+                sec
+                jmp error_cont
 
-error:
+info_error:
+                clv
+                clc
+                jmp error_cont
+                
+memory_error:
+                bit sev_value
                 ; X = page
                 ; Y = page offset
                 ; A = incorrect bits
 
-                txs                  ; save page
                 sta system_via.t1l_l ; incorrect bits
 
                 ; Add ignore bits to incorrect bits, so the displayed
@@ -1479,7 +1578,10 @@ error:
                 lda system_via.t1l_h ; get keep bits
                 eor #$ff             ; form ignore bits
                 ora system_via.t1l_l ; add incorrect bits
+error_cont:
                 sta system_via.t1l_l ; store incorrect bits
+                
+                txs                  ; save page
 
                 sty system_via.t1l_h ; page offset
 
@@ -1492,7 +1594,7 @@ error:
                 trb acccon
                 .endif
 
-                jmp error_2
+sev_value: jmp error_2
 
 ;-------------------------------------------------------------------------
 
@@ -1516,13 +1618,16 @@ reset_entry_point:
 ;-------------------------------------------------------------------------
 
 nmi_entry_point:
-                rti
+                clv
+                lda #1          ; 1=unexpected NMI
+                ; don't set the other registers. Let the values change
+                ; if there are repeated NMIs.
+                jmp other_error
 
 ;-------------------------------------------------------------------------
 
-irq_entry_point:
+irq_or_brk_entry_point:
                 rti
-
                 .endsection
 
 ;-------------------------------------------------------------------------
@@ -1530,7 +1635,13 @@ irq_entry_point:
                 .section vectors
                 .word nmi_entry_point
                 .word reset_entry_point
-                .word irq_entry_point
+                .word irq_or_brk_entry_point
                 .endsection
 
+;-------------------------------------------------------------------------
+
+                .if enable_test_hardware
+                .include "test_hardware.s65"
+                .endif
+                
 ;-------------------------------------------------------------------------
