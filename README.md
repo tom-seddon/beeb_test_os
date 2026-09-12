@@ -263,12 +263,11 @@ Shows an example of the memory test failure display, showing the
 numbers `0` to `6` inclusive, so you can get an idea of what to
 expect, and gauge how readable it'll be.
 
-Should look a bit like this Mode 7:
-[./mode_7_failure.png](./mode_7_failure.png)
+Should look like this Mode 7:
+[./docs/mode_7_failure.png](./docs/mode_7_failure.png)
 
-Should look a bit like this otherwise:
-[./mode_4_failure.png](./mode_4_failure.png) (this is a bitmap Mode 4
-display, not using the teletext-style addressing mode)
+Should look like this otherwise:
+[./docs/mode_4_failure.png](./docs/mode_4_failure.png)
 
 As with the real failure display, you'll have to press BREAK to get
 back to the initial state.
@@ -278,7 +277,7 @@ back to the initial state.
 Selects mode 7 and shows the Ceefax engineering test page.
 
 There's a PNG here to show you what to expect:
-[./engtest.png](./engtest.png).
+[./docs/engtest.png](./docs/engtest.png).
 
 ## Colour test screen
 
@@ -287,7 +286,8 @@ test card. The screen is divided into 8 rows, showing the standard 8
 BBC colours in the standard order: from top to bottom, black, red,
 green, yellow, blue, magenta, cyan and white.
 
-In both cases it should like this: [./colour_test_screen.png](./colour_test_screen.png)
+In both cases it should like this:
+[./docs/colour_test_screen.png](./docs/colour_test_screen.png)
 
 ## Memory test
 
