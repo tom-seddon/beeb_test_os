@@ -183,7 +183,6 @@ glyph_data=[
 ]
 
 def main():
-
     num_rows=8
     assert len(glyph_data)%num_rows==0
     num_glyphs=len(glyph_data)//num_rows
@@ -191,12 +190,20 @@ def main():
     labels=[]
     for row in range(num_rows):
         label='glyphs_row_%d'%row
-        print('%s:'%label)
         labels.append(label)
+
+        byte_strs=[]
         for glyph in range(num_glyphs):
-            for x in range(8):
-                value='$ff' if (glyph_data[glyph*8+row]&1<<x)!=0 else '0'
-                print('    .byte %s'%value)
+            byte=glyph_data[glyph*8+row]
+            byte_str='%{0:08b}'.format(byte)
+            byte_strs.append(byte_str)
+
+        print('%s: .byte %s'%(label,','.join(byte_strs)))
+
+        # for glyph in range(num_glyphs):
+        #     # for x in range(8):
+        #     #     value='$ff' if (glyph_data[glyph*8+row]&1<<x)!=0 else '0'
+        #     #     print('    .byte %s'%value)
 
     print('glyphs_rows=[%s]'%','.join(labels))
 

@@ -240,29 +240,33 @@ not_pressed:
 ;-------------------------------------------------------------------------
 
 draw_msn_glyph: .macro mode,xc,yc
-                and #$f0        ; (n>>4)*16
-                lsr a           ; (n>>4)*8
+                lsr a
+                lsr a
+                lsr a
+                lsr a
                 .draw_glyph \mode,\xc,\yc
                 .endmacro
 
 draw_lsn_glyph: .macro mode,xc,yc
                 and #$0f
-                asl a
-                asl a
-                asl a
                 .draw_glyph \mode,\xc,\yc
                 .endmacro
 
 draw_glyph: .macro mode,xc,yc
-                tax
+                tax             ; glyph index
+
+                ; pixels are written right to left
+                lda #%00000001
+                sta $fe01
 
                 .if \mode==7
 
                 ldy #7
 loop:
-                .for _y=0,_y<8,_y+=1
-                lda glyphs_rows[_y],x
-                bne +
+                .for scanline=0,scanline<8,scanline+=1
+                lda glyphs_rows[scanline],x
+                and $fe01
+                cmp #1
 
                 ; Better to use $20 than $00, as if bits other than
                 ; bit 5 are stuck high then you won't get any control
@@ -270,10 +274,12 @@ loop:
                 ; low, best hope other bits aren't stuck high! Or try
                 ; a bitmap mode...)
                 lda #$20
+                bcc +
+                lda #$ff
 +
-                sta $7c00+((\yc)*8+_y)*40+(\xc)*8,y
+                sta $7c00+((\yc)*8+scanline)*40+(\xc)*8,y
                 .endfor
-                inx
+                asl $fe01
                 dey
                 bpl loop
 
@@ -282,16 +288,20 @@ loop:
                 ldy #63
 loop:
 loop2:
-                .for _y=0,_y<8,_y+=1
-                lda glyphs_rows[_y],x
-                sta $5800+((\yc)*8+_y)*320+(\xc)*64,y
+                .for scanline=0,scanline<8,scanline+=1
+                lda glyphs_rows[scanline],x
+                and $fe01
+                beq +
+                lda #$ff
++
+                sta $5800+((\yc)*8+scanline)*320+(\xc)*64,y
                 .endfor
                 dey
                 tya
                 and #7
                 cmp #7
                 bne loop2
-                inx
+                asl $fe01
                 cpy #$ff
                 bne loop
                 
@@ -323,13 +333,17 @@ _done:
 
 error_screen: .macro mode
 
+                ; Prepare CRTC R15 for use as temporary storage.
+                lda #15
+                sta $fe00
+                
                 ; Error type
-
+                
                 bvs memory_error_type
 
-                lda #16*8       ; assume !
+                lda #16         ; assume !
                 bcs +           ; taken if !
-                lda #17*8       ; actually #
+                lda #17         ; actually #
 +
                 jmp draw_type_glyph
 
@@ -340,10 +354,6 @@ memory_error_type:
                 .else
                 lda #0          ; 0=ordinary memory test failure
                 .endif
-
-                asl a
-                asl a
-                asl a
 
 draw_type_glyph:
                 .draw_glyph \mode,0,0
