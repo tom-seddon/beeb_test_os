@@ -52,7 +52,7 @@ build: _folders
 .PHONY:_build
 _build: _STEM:=beeb_test_os.$(MODEL)
 _build:
-	$(_V)$(TASS) beeb_test_os.s65 -Dmodel_$(MODEL)=true $(if $(BUILD_SUFFIX),-Dbuild_suffix="$(BUILD_SUFFIX)") $(if $(ENABLE_TEST_HARDWARE),-Denable_test_hardware=true) "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
+	$(_V)$(TASS) "src/beeb_test_os.s65" -Dmodel_$(MODEL)=true $(if $(BUILD_SUFFIX),-Dbuild_suffix="$(BUILD_SUFFIX)") $(if $(ENABLE_TEST_HARDWARE),-Denable_test_hardware=true) "--list=$(BUILD)/$(_STEM).lst" "--output=$(BUILD)/$(_STEM).bin"
 
 # .PHONY:_build_master
 # _build_master: _STEM:=beeb_test_os.master$(SUFFIX)

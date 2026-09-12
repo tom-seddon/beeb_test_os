@@ -1,5 +1,5 @@
 
-                .include "submodules/beeb/include/beeb.s65"
+                .include "../submodules/beeb/include/beeb.s65"
 
 ;-------------------------------------------------------------------------
 
@@ -1518,7 +1518,7 @@ engtest:
 
 ;-------------------------------------------------------------------------
 
-                .include "build/glyphs_data.generated.s65"
+                .include "../build/glyphs_data.generated.s65"
 
                 .endsection
 
