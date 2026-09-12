@@ -41,6 +41,9 @@ num_system_via_ca1s: .fill 1
 ; keyboard test screen workspace          
 key_number: .fill 1
 key_char_x: .fill 1
+
+; storage for A during IRQ/BRK handling
+irq_a: .fill 1
                 .endsection
 
 ;-------------------------------------------------------------------------
@@ -314,6 +317,10 @@ set_crtc:
 test_hardware: .proc
                 ldx #$ff
                 txs
+
+                ; enable system VIA T1 IRQs
+                lda #$C0
+                sta system_via.ier
                 
                 lda #1
                 sta debug_state
@@ -334,6 +341,7 @@ test_hardware: .proc
                 .text 'B. Both VIA timers',13
                 .text 'K. Keyboard',13
                 .text 'S. Sound',13
+                .text 'B. BRK',13
                 .if enable_induce_nmi
                 .text 'N. Induce NMI (see documentation)',13
                 .endif
@@ -343,6 +351,8 @@ input_loop:
                 jsr read_key
                 cpx #key_k
                 beq test_keyboard
+                cpx #key_b
+                beq test_brk
                 jmp input_loop
 
 read_key: .proc
@@ -365,6 +375,12 @@ next:
                 rts
                 .endproc
 
+;-------------------------------------------------------------------------
+
+test_brk: .proc
+                brk
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
 test_keyboard: .proc
@@ -500,15 +516,20 @@ handle_irq: .macro via,flag,counter
                 .endmacro
 
 test_hardware_handle_irq:
-                pha
-
+                sta irq_a
+                pla             ; restore P
+                pha             ; save P
+                and #$10        ; test B bit
+                beq +           ; taken if IRQ
+                jmp brk_entry_point
++
                 .handle_irq system_via,VIAIRQ.t1,num_system_via_t1s
                 .handle_irq system_via,VIAIRQ.t2,num_system_via_t2s
                 .handle_irq user_via,VIAIRQ.t1,num_user_via_t1s
                 .handle_irq user_via,VIAIRQ.t2,num_user_via_t2s
                 .handle_irq system_via,VIAIRQ.ca1,num_system_via_ca1s
-                
-                pla
+
+                lda irq_a                
                 rti
 
 ;-------------------------------------------------------------------------

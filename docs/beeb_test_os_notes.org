@@ -185,13 +185,13 @@ Used for storing various bits of state.
 
 Holds memory pattern index during the memory test.
 
-*** IFR
+*** IER
 
 If T1 IRQ (bit 6) is enabled, the ROM is definitely in the hardware
 test state and RAM can be assumed to be working.
 
-(If T1 IRQ is disabled, the ROM state is indeterminate. Assume RAM not
-working.)
+If T1 IRQ is disabled, the ROM state, assume RAM not working and in
+the memory test state.
 
 * Error screen "API" spring clean
 

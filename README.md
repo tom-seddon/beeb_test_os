@@ -210,6 +210,8 @@ following values:
 
 - `01` - NMI occurred. Check for noisy NMI input to the CPU. Consider
   removing floppy disk controller and/or Econet hardware
+- `02` - `BRK` instruction encountered. The ROM does not execute any
+  BRK instructions during the memory test
 
 ----
 

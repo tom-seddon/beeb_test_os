@@ -1627,7 +1627,17 @@ nmi_entry_point:
 ;-------------------------------------------------------------------------
 
 irq_or_brk_entry_point:
-                rti
+                ; if T1 IRQ is disabled, assume no RAM and IRQs
+                ; disabled. So BRK is the only way to get here.
+                bit system_via.ier
+                bvc brk_entry_point
+                .if enable_test_hardware
+                jmp test_hardware_handle_irq
+                .endif
+brk_entry_point:
+                clv
+                lda #2          ; 2=unexpected BRK
+                jmp other_error
                 .endsection
 
 ;-------------------------------------------------------------------------
